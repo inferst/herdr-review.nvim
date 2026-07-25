@@ -59,17 +59,18 @@ function M.setup(opts)
     end,
   })
 
+  vim.api.nvim_create_autocmd("User", {
+    pattern = "DiffviewViewClosed",
+    group = group,
+    callback = function()
+      session.on_view_closed()
+    end,
+  })
+
   vim.api.nvim_create_autocmd("BufEnter", {
     group = group,
     callback = function()
       session.on_buf_enter(vim.api.nvim_get_current_buf())
-    end,
-  })
-
-  vim.api.nvim_create_autocmd("CursorMoved", {
-    group = group,
-    callback = function()
-      session.check_range()
     end,
   })
 

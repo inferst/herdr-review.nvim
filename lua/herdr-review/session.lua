@@ -163,6 +163,19 @@ function M.on_buf_enter(bufnr)
 end
 
 function M.check_range()
+  local view = diff.get_current_view()
+  if not view then
+    if M.current_range then
+      for _, bufnr in ipairs(vim.api.nvim_list_bufs()) do
+        if vim.api.nvim_buf_is_loaded(bufnr) then
+          M.clear_extmarks(bufnr)
+        end
+      end
+      M.current_range = nil
+    end
+    return
+  end
+
   local range = M.get_commit_range()
   if not range or range == M.current_range then
     return
@@ -175,6 +188,15 @@ function M.check_range()
   end
 
   M.load_session(range)
+end
+
+function M.on_view_closed()
+  for _, bufnr in ipairs(vim.api.nvim_list_bufs()) do
+    if vim.api.nvim_buf_is_loaded(bufnr) then
+      M.clear_extmarks(bufnr)
+    end
+  end
+  M.current_range = nil
 end
 
 return M
