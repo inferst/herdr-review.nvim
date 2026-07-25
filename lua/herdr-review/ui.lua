@@ -5,25 +5,6 @@ local herdr = require("herdr-review.herdr")
 
 local M = {}
 
----@param range string
-function M.refresh_all_extmarks(range)
-  local comments = storage.get_comments(range)
-  for _, bufnr in ipairs(vim.api.nvim_list_bufs()) do
-    if vim.api.nvim_buf_is_loaded(bufnr) then
-      session.clear_extmarks(bufnr)
-      local file = session.get_buf_file(bufnr)
-      for _, c in ipairs(comments) do
-        if c.file == file then
-          local line = c.side == "new" and c.line_new or c.line_old
-          if line then
-            session.place_extmark(bufnr, line, c.text)
-          end
-        end
-      end
-    end
-  end
-end
-
 function M.create_comment()
   local file, side, line, file_old = diff.get_cursor_context()
   if not file or not side or not line then
@@ -155,7 +136,7 @@ function M.open_list()
     end
     local c = comments[idx]
     storage.delete_comment(range, c.id)
-    M.refresh_all_extmarks(range)
+    session.load_session(range)
     vim.api.nvim_win_close(win, true)
     M.open_list()
   end, { buffer = buf })
@@ -164,7 +145,7 @@ end
 ---@param comment table
 function M.jump_to_comment(comment)
   local view = diff.get_current_view()
-  if not view then
+  if not view or not view.cur_layout then
     return
   end
 
@@ -191,7 +172,7 @@ function M.edit_comment(range, comment, list_win, comments)
       return
     end
     storage.update_comment(range, comment.id, { text = text })
-    M.refresh_all_extmarks(range)
+    session.load_session(range)
     vim.api.nvim_win_close(list_win, true)
     M.open_list()
   end)

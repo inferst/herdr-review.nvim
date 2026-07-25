@@ -52,25 +52,6 @@ function M.list_agents()
   return agents, ""
 end
 
----@param target string
----@param text string
----@return boolean, string
-function M.send_prompt(target, text)
-  local ok, err = M.check_server()
-  if not ok then
-    return false, err
-  end
-
-  local escaped = vim.fn.shellescape(text)
-  local cmd = string.format("herdr agent prompt %s %s", target, escaped)
-  local result = vim.fn.system(cmd)
-  if vim.v.shell_error ~= 0 then
-    return false, "Failed to send prompt: " .. (result or "unknown error")
-  end
-
-  return true, ""
-end
-
 ---@param range string
 ---@param comments table[]
 ---@return string

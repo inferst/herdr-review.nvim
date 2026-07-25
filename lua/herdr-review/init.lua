@@ -54,8 +54,6 @@ function M.setup(opts)
       if side and file then
         diff.set_buf_side(bufnr, side, file)
       end
-
-      session.on_buf_enter(bufnr)
     end,
   })
 

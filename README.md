@@ -37,17 +37,17 @@ Leave comments on diff lines, review them in a floating window, and send to a he
 ## Usage
 
 1. Open Diffview: `:DiffviewOpen`
-2. Navigate to a line and press `<leader>gc` to add a comment
-3. Press `<leader>gl` to open the comment list
-4. Press `<leader>gs` to send comments to a herdr agent
+2. Navigate to a line and press `<leader>rc` to add a comment
+3. Press `<leader>rl` to open the comment list
+4. Press `<leader>rs` to send comments to a herdr agent
 
 ## Keybindings
 
 | Key | Action |
 |-----|--------|
-| `<leader>gc` | Add comment on current diff line |
-| `<leader>gl` | Open comment list (floating window) |
-| `<leader>gs` | Send comments to herdr agent |
+| `<leader>rc` | Add comment on current diff line |
+| `<leader>rl` | Open comment list (floating window) |
+| `<leader>rs` | Send comments to herdr agent |
 
 ### Comment list keybindings
 
@@ -63,9 +63,9 @@ Leave comments on diff lines, review them in a floating window, and send to a he
 ```lua
 require("herdr-review").setup({
   keymaps = {
-    create_comment = "gc",
-    open_list = "gl",
-    send_to_agent = "gs",
+    create_comment = "rc",
+    open_list = "rl",
+    send_to_agent = "rs",
   },
 })
 ```
@@ -74,8 +74,7 @@ require("herdr-review").setup({
 
 - Comments are stored in `~/.local/share/nvim/herdr-review/<commit-range>.json`
 - Each comment is tied to a file, side (old/new), and line number
-- On `<leader>gs`, a structured prompt is sent to the selected herdr agent
-- Comments are marked as "sent" after successful delivery
+- On `<leader>rs`, a structured prompt is sent to the selected herdr agent
 
 ## License
 

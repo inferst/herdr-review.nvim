@@ -7,6 +7,20 @@ local M = {}
 ---@type string|nil
 M.current_range = nil
 
+local function apply_comments(bufnr, comments)
+  M.clear_extmarks(bufnr)
+  local file = M.get_buf_file(bufnr)
+  if not file then return end
+  for _, c in ipairs(comments) do
+    if c.file == file then
+      local line = c.side == "new" and c.line_new or c.line_old
+      if line then
+        M.place_extmark(bufnr, line, c.text)
+      end
+    end
+  end
+end
+
 ---@param bufnr integer
 ---@param line integer
 ---@param text string
@@ -95,27 +109,16 @@ end
 function M.load_session(range)
   M.current_range = range
   local comments = storage.get_comments(range)
-
   for _, bufnr in ipairs(vim.api.nvim_list_bufs()) do
     if vim.api.nvim_buf_is_loaded(bufnr) then
-      M.clear_extmarks(bufnr)
-      for _, c in ipairs(comments) do
-        if c.file == M.get_buf_file(bufnr) then
-          local line = c.side == "new" and c.line_new or c.line_old
-          if line then
-            M.place_extmark(bufnr, line, c.text)
-          end
-        end
-      end
+      apply_comments(bufnr, comments)
     end
   end
 end
 
 function M.on_view_opened()
   local range = M.get_commit_range()
-  if not range then
-    return
-  end
+  if not range then return end
 
   if M.current_range and range ~= M.current_range then
     for _, bufnr in ipairs(vim.api.nvim_list_bufs()) do
@@ -123,7 +126,6 @@ function M.on_view_opened()
         M.clear_extmarks(bufnr)
       end
     end
-    storage.clear(range)
   end
 
   M.load_session(range)
@@ -138,58 +140,13 @@ function M.on_buf_enter(bufnr)
         M.clear_extmarks(b)
       end
     end
-    storage.clear(range)
     M.load_session(range)
     return
   end
 
-  if not M.current_range then
-    return
-  end
+  if not M.current_range then return end
 
-  local comments = storage.get_comments(M.current_range)
-  local file = M.get_buf_file(bufnr)
-  if not file then
-    return
-  end
-
-  M.clear_extmarks(bufnr)
-  for _, c in ipairs(comments) do
-    if c.file == file then
-      local line = c.side == "new" and c.line_new or c.line_old
-      if line then
-        M.place_extmark(bufnr, line, c.text)
-      end
-    end
-  end
-end
-
-function M.check_range()
-  local view = diff.get_current_view()
-  if not view then
-    if M.current_range then
-      for _, bufnr in ipairs(vim.api.nvim_list_bufs()) do
-        if vim.api.nvim_buf_is_loaded(bufnr) then
-          M.clear_extmarks(bufnr)
-        end
-      end
-      M.current_range = nil
-    end
-    return
-  end
-
-  local range = M.get_commit_range()
-  if not range or range == M.current_range then
-    return
-  end
-
-  for _, bufnr in ipairs(vim.api.nvim_list_bufs()) do
-    if vim.api.nvim_buf_is_loaded(bufnr) then
-      M.clear_extmarks(bufnr)
-    end
-  end
-
-  M.load_session(range)
+  apply_comments(bufnr, storage.get_comments(M.current_range))
 end
 
 function M.on_view_closed()

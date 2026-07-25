@@ -23,11 +23,6 @@ function M.get_buf_side(bufnr)
   return nil, nil
 end
 
----@param bufnr integer
-function M.clear_buf_side(bufnr)
-  buf_side_map[bufnr] = nil
-end
-
 ---@return table|nil
 function M.get_current_view()
   local ok, lib = pcall(require, "diffview.lib")
@@ -67,33 +62,6 @@ function M.get_cursor_context()
   local file_old = entry.oldpath
 
   return file, side, line, file_old
-end
-
----@return table[]
-function M.get_diff_lines(bufnr)
-  local hunks = {}
-  local prev_start = nil
-  local line_count = vim.api.nvim_buf_line_count(bufnr)
-
-  for line = 1, line_count do
-    local diff_hl = vim.fn.diff_hlID(line, 0)
-    if diff_hl ~= 0 then
-      if not prev_start then
-        prev_start = line
-      end
-    else
-      if prev_start then
-        table.insert(hunks, { first = prev_start, last = line - 1 })
-        prev_start = nil
-      end
-    end
-  end
-
-  if prev_start then
-    table.insert(hunks, { first = prev_start, last = line_count })
-  end
-
-  return hunks
 end
 
 ---@param bufnr integer
