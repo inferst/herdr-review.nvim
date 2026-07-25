@@ -66,6 +66,13 @@ function M.setup(opts)
     end,
   })
 
+  vim.api.nvim_create_autocmd("CursorMoved", {
+    group = group,
+    callback = function()
+      session.check_range()
+    end,
+  })
+
   vim.keymap.set("n", "<leader>" .. config.keymaps.create_comment, function()
     ui.create_comment()
   end, { desc = "Herdr Review: Add comment" })
