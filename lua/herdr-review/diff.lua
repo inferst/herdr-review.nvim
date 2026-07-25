@@ -9,8 +9,9 @@ local buf_side_map = {}
 ---@param bufnr integer
 ---@param side string
 ---@param file table
-function M.set_buf_side(bufnr, side, file)
-  buf_side_map[bufnr] = { side = side, file = file }
+---@param file_path string|nil
+function M.set_buf_side(bufnr, side, file, file_path)
+  buf_side_map[bufnr] = { side = side, file = file, path = file_path }
 end
 
 ---@param bufnr integer
@@ -21,6 +22,13 @@ function M.get_buf_side(bufnr)
     return entry.side, entry.file
   end
   return nil, nil
+end
+
+---@param bufnr integer
+---@return string|nil
+function M.get_buf_path(bufnr)
+  local entry = buf_side_map[bufnr]
+  return entry and entry.path or nil
 end
 
 ---@return table|nil

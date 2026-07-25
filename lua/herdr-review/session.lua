@@ -12,9 +12,9 @@ local function path_strip_prefix(p)
   return p
 end
 
-local function apply_comments(bufnr, comments)
+local function apply_comments(bufnr, comments, file)
   M.clear_extmarks(bufnr)
-  local file = M.get_buf_file(bufnr)
+  file = file or diff.get_buf_path(bufnr) or M.get_buf_file(bufnr)
   if not file then return end
   file = path_strip_prefix(file)
   for _, c in ipairs(comments) do
@@ -94,6 +94,16 @@ function M.get_buf_file(bufnr)
     return nil
   end
 
+  if name:sub(1, 11) == "diffview://" then
+    local git_pos = name:find("/.git/", 12, true)
+    if git_pos then
+      local rel_start = name:find("/", git_pos + 5, true)
+      if rel_start then
+        return name:sub(rel_start + 1)
+      end
+    end
+  end
+
   local view = diff.get_current_view()
   if not view then
     return nil
@@ -137,7 +147,7 @@ function M.on_view_opened()
   M.load_session(range)
 end
 
-function M.on_buf_enter(bufnr)
+function M.on_buf_enter(bufnr, file)
   local range = M.get_commit_range()
 
   if range then
@@ -149,12 +159,12 @@ function M.on_buf_enter(bufnr)
       end
       M.load_session(range)
     end
-    apply_comments(bufnr, storage.get_comments(range))
+    apply_comments(bufnr, storage.get_comments(range), file)
     return
   end
 
   if M.current_range then
-    apply_comments(bufnr, storage.get_comments(M.current_range))
+    apply_comments(bufnr, storage.get_comments(M.current_range), file)
   end
 end
 

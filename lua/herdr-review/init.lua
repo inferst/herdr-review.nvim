@@ -52,7 +52,11 @@ function M.setup(opts)
       end
 
       if side and file then
-        diff.set_buf_side(bufnr, side, file)
+        local file_path = type(file) == "string" and file or file.path
+        diff.set_buf_side(bufnr, side, file, file_path)
+        session.on_buf_enter(bufnr, file_path)
+      else
+        session.on_buf_enter(bufnr)
       end
     end,
   })
