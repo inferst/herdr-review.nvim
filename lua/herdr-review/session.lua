@@ -7,12 +7,18 @@ local M = {}
 ---@type string|nil
 M.current_range = nil
 
+local function path_strip_prefix(p)
+  if p:sub(1, 2) == "./" then return p:sub(3) end
+  return p
+end
+
 local function apply_comments(bufnr, comments)
   M.clear_extmarks(bufnr)
   local file = M.get_buf_file(bufnr)
   if not file then return end
+  file = path_strip_prefix(file)
   for _, c in ipairs(comments) do
-    if c.file == file then
+    if path_strip_prefix(c.file) == file then
       local line = c.side == "new" and c.line_new or c.line_old
       if line then
         M.place_extmark(bufnr, line, c.text)
@@ -134,22 +140,26 @@ end
 function M.on_buf_enter(bufnr)
   local range = M.get_commit_range()
 
-  if range and M.current_range and range ~= M.current_range then
-    for _, b in ipairs(vim.api.nvim_list_bufs()) do
-      if vim.api.nvim_buf_is_loaded(b) then
-        M.clear_extmarks(b)
+  if range then
+    if M.current_range ~= range then
+      for _, b in ipairs(vim.api.nvim_list_bufs()) do
+        if vim.api.nvim_buf_is_loaded(b) then
+          M.clear_extmarks(b)
+        end
       end
+      M.load_session(range)
     end
-    M.load_session(range)
+    apply_comments(bufnr, storage.get_comments(range))
     return
   end
 
-  if not M.current_range then return end
-
-  apply_comments(bufnr, storage.get_comments(M.current_range))
+  if M.current_range then
+    apply_comments(bufnr, storage.get_comments(M.current_range))
+  end
 end
 
 function M.on_view_closed()
+  M.current_range = nil
   for _, bufnr in ipairs(vim.api.nvim_list_bufs()) do
     if vim.api.nvim_buf_is_loaded(bufnr) then
       M.clear_extmarks(bufnr)
