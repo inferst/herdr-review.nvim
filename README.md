@@ -1,4 +1,4 @@
-# nvim-herdr-review
+# herdr-review.nvim
 
 Code review plugin for Neovim with [Diffview.nvim](https://github.com/sindrets/diffview.nvim) and [herdr](https://github.com/herdr/herdr) integration.
 
