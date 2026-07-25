@@ -1,3 +1,4 @@
+local config = require("herdr-review.config")
 local diff = require("herdr-review.diff")
 local storage = require("herdr-review.storage")
 local session = require("herdr-review.session")
@@ -18,31 +19,70 @@ function M.create_comment()
     return
   end
 
-  vim.ui.input({ prompt = "Comment: " }, function(text)
+  local existing_comment = nil
+  for _, c in ipairs(storage.get_comments(range)) do
+    if c.file_new == file and c.side == side then
+      local target_line = side == "new" and c.line_new or c.line_old
+      if target_line and target_line == line then
+        existing_comment = c
+        break
+      end
+    end
+  end
+
+  vim.ui.input({
+    prompt = existing_comment and "Edit comment: " or "Comment: ",
+    default = existing_comment and existing_comment.text or "",
+  }, function(text)
     if not text or text == "" then
       return
     end
 
     local bufnr = vim.api.nvim_get_current_buf()
     local context_lines = diff.get_context(bufnr, line, 3)
+    local context = table.concat(context_lines, "\n")
 
-    local comment = {
-      id = storage.generate_id(),
-      file = file,
-      file_old = file_old,
-      file_new = file,
-      line_new = side == "new" and line or nil,
-      line_old = side == "old" and line or nil,
-      side = side,
-      text = text,
-      context = table.concat(context_lines, "\n"),
-      created_at = os.date("!%Y-%m-%dT%H:%M:%SZ"),
-    }
-
-    storage.add_comment(range, comment)
-    session.place_extmark(bufnr, line, text)
-    vim.notify("Comment added", vim.log.levels.INFO)
+    if existing_comment then
+      storage.update_comment(range, existing_comment.id, { text = text, context = context })
+      vim.notify("Comment updated", vim.log.levels.INFO)
+    else
+      local comment = {
+        id = storage.generate_id(),
+        file = file,
+        file_old = file_old,
+        file_new = file,
+        line_new = side == "new" and line or nil,
+        line_old = side == "old" and line or nil,
+        side = side,
+        text = text,
+        context = context,
+        created_at = os.date("!%Y-%m-%dT%H:%M:%SZ"),
+      }
+      storage.add_comment(range, comment)
+      vim.notify("Comment added", vim.log.levels.INFO)
+    end
+    session.load_session(range)
   end)
+end
+
+local function wrap_text(text, max_width)
+  local result = {}
+  while #text > 0 do
+    if #text <= max_width then
+      table.insert(result, text)
+      break
+    end
+    local sub = text:sub(1, max_width + 1)
+    local space = sub:match("^.*()%s")
+    if space and space > 1 then
+      table.insert(result, text:sub(1, space - 1))
+      text = text:sub(space + 1)
+    else
+      table.insert(result, text:sub(1, max_width))
+      text = text:sub(max_width + 1)
+    end
+  end
+  return result
 end
 
 function M.open_list()
@@ -58,7 +98,11 @@ function M.open_list()
     return
   end
 
+  local list_width = config.list_width
+  local text_width = list_width - 6
   local lines = {}
+  local row_to_idx = {}
+
   table.insert(lines, string.format("─── Review: %s ─── %d comments ───", range, #comments))
   table.insert(lines, "")
 
@@ -68,7 +112,15 @@ function M.open_list()
       file = c.file_old .. " → " .. c.file
     end
     local line_num = c.side == "new" and c.line_new or c.line_old
-    table.insert(lines, string.format("  %d  %s:%d (%s)  \"%s\"", i, file, line_num, c.side, c.text))
+    local header = string.format("  %d  %s:%d (%s)", i, file, line_num, c.side)
+    table.insert(lines, header)
+    row_to_idx[#lines] = i
+
+    local wrapped = wrap_text(c.text, text_width)
+    for _, chunk in ipairs(wrapped) do
+      table.insert(lines, "    " .. chunk)
+      row_to_idx[#lines] = i
+    end
   end
 
   table.insert(lines, "")
@@ -79,14 +131,9 @@ function M.open_list()
   vim.bo[buf].modifiable = false
   vim.bo[buf].filetype = "herdr-review-list"
 
-  local width = 0
-  for _, l in ipairs(lines) do
-    if #l > width then
-      width = #l
-    end
-  end
-  width = math.min(width + 4, vim.o.columns - 4)
-  local height = #lines
+  local width = math.min(list_width, vim.o.columns - 4)
+  local height = math.min(#lines, vim.o.lines - 4)
+  height = math.max(height, 5)
 
   local row = math.floor((vim.o.lines - height) / 2)
   local col = math.floor((vim.o.columns - width) / 2)
@@ -103,14 +150,23 @@ function M.open_list()
     title_pos = "center",
   })
 
+  local function cursor_idx()
+    local cursor = vim.api.nvim_win_get_cursor(win)
+    for r = cursor[1], 1, -1 do
+      if row_to_idx[r] then
+        return row_to_idx[r]
+      end
+    end
+    return nil
+  end
+
   vim.keymap.set("n", "q", function()
     vim.api.nvim_win_close(win, true)
   end, { buffer = buf })
 
   vim.keymap.set("n", "<CR>", function()
-    local cursor = vim.api.nvim_win_get_cursor(win)
-    local idx = cursor[1] - 2
-    if idx < 1 or idx > #comments then
+    local idx = cursor_idx()
+    if not idx then
       return
     end
     local c = comments[idx]
@@ -119,9 +175,8 @@ function M.open_list()
   end, { buffer = buf })
 
   vim.keymap.set("n", "e", function()
-    local cursor = vim.api.nvim_win_get_cursor(win)
-    local idx = cursor[1] - 2
-    if idx < 1 or idx > #comments then
+    local idx = cursor_idx()
+    if not idx then
       return
     end
     local c = comments[idx]
@@ -129,9 +184,8 @@ function M.open_list()
   end, { buffer = buf })
 
   vim.keymap.set("n", "d", function()
-    local cursor = vim.api.nvim_win_get_cursor(win)
-    local idx = cursor[1] - 2
-    if idx < 1 or idx > #comments then
+    local idx = cursor_idx()
+    if not idx then
       return
     end
     local c = comments[idx]
@@ -144,22 +198,79 @@ end
 
 ---@param comment table
 function M.jump_to_comment(comment)
+  local target_file = comment.file_new
+  if not target_file then
+    return
+  end
+
+  local match_file = comment.side == "new" and comment.file_new or comment.file_old
+  if not match_file then
+    match_file = comment.file_new
+  end
+
+  local function strip_path(p)
+    return p:sub(1, 2) == "./" and p:sub(3) or p
+  end
+
+  target_file = strip_path(target_file)
+  match_file = strip_path(match_file)
+
+  local function panel_win(view)
+    if not view or not view.cur_layout then
+      return nil
+    end
+    local panel = comment.side == "new" and view.cur_layout.b or view.cur_layout.a
+    if not panel or not panel.id then
+      return nil
+    end
+    local panel_path = panel.file and (type(panel.file) == "string" and panel.file or panel.file.path)
+    if not panel_path then
+      return nil
+    end
+    if strip_path(panel_path) ~= match_file then
+      return nil
+    end
+    return panel.id
+  end
+
+  local function focus_win(win_id)
+    vim.api.nvim_set_current_win(win_id)
+    local line = comment.side == "new" and comment.line_new or comment.line_old
+    if line then
+      pcall(vim.api.nvim_win_set_cursor, win_id, { line, 0 })
+    end
+  end
+
   local view = diff.get_current_view()
-  if not view or not view.cur_layout then
+  local wid = view and panel_win(view)
+  if wid then
+    focus_win(wid)
     return
   end
 
-  local target_win = (comment.side == "old") and view.cur_layout.a or view.cur_layout.b
-  if not target_win then
+  if view and view.set_file_by_path then
+    view:set_file_by_path(target_file, true, true)
+
+    local function try_focus(attempts)
+      if attempts <= 0 then
+        vim.notify("Could not find window for " .. target_file, vim.log.levels.WARN)
+        return
+      end
+      vim.schedule(function()
+        local w = panel_win(diff.get_current_view())
+        if w then
+          focus_win(w)
+        else
+          try_focus(attempts - 1)
+        end
+      end)
+    end
+
+    try_focus(10)
     return
   end
 
-  vim.api.nvim_set_current_win(target_win.id)
-
-  local line = comment.side == "new" and comment.line_new or comment.line_old
-  if line then
-    vim.api.nvim_win_set_cursor(target_win.id, { line, 0 })
-  end
+  vim.notify("Could not find window for " .. target_file, vim.log.levels.WARN)
 end
 
 ---@param range string
