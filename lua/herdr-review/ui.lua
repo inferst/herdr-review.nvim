@@ -55,8 +55,6 @@ function M.create_comment()
       side = side,
       text = text,
       context = table.concat(context_lines, "\n"),
-      sent = false,
-      sent_at = nil,
       created_at = os.date("!%Y-%m-%dT%H:%M:%SZ"),
     }
 
@@ -79,15 +77,8 @@ function M.open_list()
     return
   end
 
-  local sent_count = 0
-  for _, c in ipairs(comments) do
-    if c.sent then
-      sent_count = sent_count + 1
-    end
-  end
-
   local lines = {}
-  table.insert(lines, string.format("─── Review: %s ─── %d comments (%d sent) ───", range, #comments, sent_count))
+  table.insert(lines, string.format("─── Review: %s ─── %d comments ───", range, #comments))
   table.insert(lines, "")
 
   for i, c in ipairs(comments) do
@@ -96,8 +87,7 @@ function M.open_list()
       file = c.file_old .. " → " .. c.file
     end
     local line_num = c.side == "new" and c.line_new or c.line_old
-    local marker = c.sent and " ✓" or ""
-    table.insert(lines, string.format("  %d  %s:%d (%s)  \"%s\"%s", i, file, line_num, c.side, c.text, marker))
+    table.insert(lines, string.format("  %d  %s:%d (%s)  \"%s\"", i, file, line_num, c.side, c.text))
   end
 
   table.insert(lines, "")
@@ -256,19 +246,12 @@ function M.send_to_agent()
 
   local function do_send(agent)
     local all_comments = storage.get_comments(range)
-    local unsent = {}
-    for _, c in ipairs(all_comments) do
-      if not c.sent then
-        table.insert(unsent, c)
-      end
-    end
-
-    if #unsent == 0 then
-      vim.notify("No unsent comments", vim.log.levels.INFO)
+    if #all_comments == 0 then
+      vim.notify("No comments", vim.log.levels.INFO)
       return
     end
 
-    local prompt = herdr.build_prompt(range, unsent)
+    local prompt = herdr.build_prompt(range, all_comments)
 
     local text_cmd = string.format("herdr pane send-text %s %s", agent.pane_id, vim.fn.shellescape(prompt))
     vim.fn.system(text_cmd)
@@ -280,12 +263,7 @@ function M.send_to_agent()
     local focus_cmd = string.format("herdr agent focus %s", agent.pane_id)
     vim.fn.system(focus_cmd)
 
-    local now = os.date("!%Y-%m-%dT%H:%M:%SZ")
-    for _, c in ipairs(unsent) do
-      storage.update_comment(range, c.id, { sent = true, sent_at = now })
-    end
-
-    vim.notify(string.format("Staged %d comments for %s. Press Enter to send.", #unsent, agent.name), vim.log.levels.INFO)
+    vim.notify(string.format("Staged %d comments for %s. Press Enter to send.", #all_comments, agent.name), vim.log.levels.INFO)
   end
 
   if #filtered == 1 then

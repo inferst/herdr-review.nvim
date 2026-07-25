@@ -117,12 +117,13 @@ function M.on_view_opened()
     return
   end
 
-  if range ~= M.current_range then
+  if M.current_range and range ~= M.current_range then
     for _, bufnr in ipairs(vim.api.nvim_list_bufs()) do
       if vim.api.nvim_buf_is_loaded(bufnr) then
         M.clear_extmarks(bufnr)
       end
     end
+    storage.clear(range)
   end
 
   M.load_session(range)
@@ -131,12 +132,13 @@ end
 function M.on_buf_enter(bufnr)
   local range = M.get_commit_range()
 
-  if range and range ~= M.current_range then
+  if range and M.current_range and range ~= M.current_range then
     for _, b in ipairs(vim.api.nvim_list_bufs()) do
       if vim.api.nvim_buf_is_loaded(b) then
         M.clear_extmarks(b)
       end
     end
+    storage.clear(range)
     M.load_session(range)
     return
   end
@@ -196,7 +198,6 @@ function M.on_view_closed()
       M.clear_extmarks(bufnr)
     end
   end
-  M.current_range = nil
 end
 
 return M

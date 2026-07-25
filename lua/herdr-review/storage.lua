@@ -84,4 +84,9 @@ function M.generate_id()
   return string.lower(vim.fn.system("uuidgen"):gsub("\n", ""))
 end
 
+---@param range string
+function M.clear(range)
+  M.save(range, { version = 1, range = range, comments = {} })
+end
+
 return M
