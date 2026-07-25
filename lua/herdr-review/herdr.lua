@@ -45,6 +45,7 @@ function M.list_agents()
       name = agent.agent,
       status = agent.agent_status,
       pane_id = agent.pane_id,
+      cwd = agent.cwd,
     })
   end
 

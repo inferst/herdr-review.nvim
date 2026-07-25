@@ -117,10 +117,15 @@ function M.open_list()
   width = math.min(width + 4, vim.o.columns - 4)
   local height = #lines
 
+  local row = math.floor((vim.o.lines - height) / 2)
+  local col = math.floor((vim.o.columns - width) / 2)
+
   local win = vim.api.nvim_open_win(buf, true, {
     relative = "editor",
     width = width,
     height = height,
+    row = row,
+    col = col,
     style = "minimal",
     border = "rounded",
     title = " Review Comments ",
@@ -215,23 +220,41 @@ function M.send_to_agent()
     return
   end
 
+  local view = diff.get_current_view()
+  if not view or not view.adapter or not view.adapter.ctx then
+    vim.notify("Cannot determine project root", vim.log.levels.ERROR)
+    return
+  end
+
+  local project_root = view.adapter.ctx.toplevel
+  if not project_root then
+    vim.notify("Cannot determine project root", vim.log.levels.ERROR)
+    return
+  end
+
   local agents, agent_err = herdr.list_agents()
   if #agents == 0 then
     vim.notify(agent_err ~= "" and agent_err or "No agents available", vim.log.levels.ERROR)
     return
   end
 
-  local names = {}
+  local filtered = {}
   for _, a in ipairs(agents) do
-    table.insert(names, a.name .. " (" .. a.status .. ")")
+    if a.cwd and a.cwd == project_root then
+      table.insert(filtered, a)
+    end
   end
 
-  vim.ui.select(names, { prompt = "Send to agent:" }, function(choice, idx)
-    if not choice then
-      return
+  if #filtered == 0 then
+    local agent_cwds = {}
+    for _, a in ipairs(agents) do
+      table.insert(agent_cwds, a.name .. "=" .. (a.cwd or "nil"))
     end
+    vim.notify("No agents in " .. project_root .. ". Found: " .. table.concat(agent_cwds, ", "), vim.log.levels.ERROR)
+    return
+  end
 
-    local agent = agents[idx]
+  local function do_send(agent)
     local all_comments = storage.get_comments(range)
     local unsent = {}
     for _, c in ipairs(all_comments) do
@@ -246,18 +269,40 @@ function M.send_to_agent()
     end
 
     local prompt = herdr.build_prompt(range, unsent)
-    local send_ok, send_err = herdr.send_prompt(agent.name, prompt)
-    if not send_ok then
-      vim.notify(send_err, vim.log.levels.ERROR)
+
+    local text_cmd = string.format("herdr pane send-text %s %s", agent.pane_id, vim.fn.shellescape(prompt))
+    vim.fn.system(text_cmd)
+    if vim.v.shell_error ~= 0 then
+      vim.notify("Failed to stage prompt", vim.log.levels.ERROR)
       return
     end
+
+    local focus_cmd = string.format("herdr agent focus %s", agent.pane_id)
+    vim.fn.system(focus_cmd)
 
     local now = os.date("!%Y-%m-%dT%H:%M:%SZ")
     for _, c in ipairs(unsent) do
       storage.update_comment(range, c.id, { sent = true, sent_at = now })
     end
 
-    vim.notify(string.format("Sent %d comments to %s", #unsent, agent.name), vim.log.levels.INFO)
+    vim.notify(string.format("Staged %d comments for %s. Press Enter to send.", #unsent, agent.name), vim.log.levels.INFO)
+  end
+
+  if #filtered == 1 then
+    do_send(filtered[1])
+    return
+  end
+
+  local names = {}
+  for _, a in ipairs(filtered) do
+    table.insert(names, a.name .. " (" .. a.pane_id .. ") " .. a.status)
+  end
+
+  vim.ui.select(names, { prompt = "Send to agent:" }, function(choice, idx)
+    if not choice then
+      return
+    end
+    do_send(filtered[idx])
   end)
 end
 

@@ -47,12 +47,16 @@ function M.get_commit_range()
     left_str = string.sub(left.commit, 1, 7)
   elseif left.type == 1 then
     left_str = "WORKDIR"
+  elseif left.type == 3 then
+    left_str = "INDEX"
   end
 
   if right.commit then
     right_str = string.sub(right.commit, 1, 7)
   elseif right.type == 1 then
     right_str = "WORKDIR"
+  elseif right.type == 3 then
+    right_str = "INDEX"
   end
 
   if left_str == "" or right_str == "" then
