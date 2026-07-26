@@ -1,27 +1,42 @@
 describe("herdr prompt", function()
   local herdr = require("herdr-review.herdr")
 
-  it("includes the review range and each comment", function()
+  it("formats comments with their diff side and context", function()
     local prompt = herdr.build_prompt("HEAD..WORKDIR", {
       {
-        file = "lua/example.lua",
-        side = "new",
-        line = 12,
-        text = "Use a named helper here.",
+        file = "crates/plugin/src/runtime.rs",
+        side = "old",
+        line = 109,
+        text = "Test comment 1",
+        context = "        // A broken Plugin is isolated to its own status. Startup must still",
       },
       {
-        file = "lua/old.lua",
-        side = "old",
-        line = 4,
-        text = "Remove this branch.",
+        file = "crates/plugin/src/runtime.rs",
+        side = "new",
+        line = 118,
+        text = "Test comment 2",
+        context = "    // Test changes in file",
       },
     })
 
-    assert.is_true(prompt:find("Diff range: HEAD..WORKDIR", 1, true) ~= nil)
-    assert.is_true(prompt:find("File: lua/example.lua (new, line 12)", 1, true) ~= nil)
-    assert.is_true(prompt:find("Comment: Use a named helper here.", 1, true) ~= nil)
-    assert.is_true(prompt:find("File: lua/old.lua (old, line 4)", 1, true) ~= nil)
-    assert.is_true(prompt:find("Comment: Remove this branch.", 1, true) ~= nil)
+    assert.are.equal(
+      table.concat({
+        "You are reviewing code. Here are the review comments for this diff.",
+        "",
+        "Diff range: HEAD..WORKDIR",
+        "",
+        "crates/plugin/src/runtime.rs:109 (removed)",
+        "-        // A broken Plugin is isolated to its own status. Startup must still",
+        "Test comment 1",
+        "",
+        "crates/plugin/src/runtime.rs:118",
+        "+    // Test changes in file",
+        "Test comment 2",
+        "",
+        "Please fix all issues mentioned above.",
+      }, "\n"),
+      prompt
+    )
   end)
 end)
 
