@@ -22,7 +22,17 @@ local function send_comments(range, agent)
     return
   end
 
-  local prompt = herdr.build_prompt(range, all_comments)
+  local fresh_comments = {}
+  for _, comment in ipairs(all_comments) do
+    if not session.is_stale(comment.id) then
+      table.insert(fresh_comments, comment)
+    end
+  end
+  if #fresh_comments == 0 then
+    return
+  end
+
+  local prompt = herdr.build_prompt(range, fresh_comments)
   local sent, send_err = herdr.send_text(agent.pane_id, prompt)
   if not sent then
     vim.notify(send_err or "Failed to stage prompt", vim.log.levels.ERROR)
@@ -36,7 +46,7 @@ local function send_comments(range, agent)
   end
 
   vim.notify(
-    string.format("Staged %d comments for %s. Press Enter to send.", #all_comments, agent.name),
+    string.format("Staged %d comments for %s. Press Enter to send.", #fresh_comments, agent.name),
     vim.log.levels.INFO
   )
 end
@@ -55,12 +65,12 @@ function M.send_to_agent()
   end
 
   local view = diff.get_current_view()
-  if not view or not view.adapter or not view.adapter.ctx then
+  if not view then
     vim.notify("Cannot determine project root", vim.log.levels.ERROR)
     return
   end
 
-  local project_root = view.adapter.ctx.toplevel
+  local project_root = view:get_repo_root()
   if not project_root then
     vim.notify("Cannot determine project root", vim.log.levels.ERROR)
     return

@@ -1,59 +1,100 @@
 describe("review session", function()
   local config = require("herdr-review.config")
-  local diff = require("herdr-review.diff")
   local session = require("herdr-review.session")
   local storage = require("herdr-review.storage")
-  local original_get_current_view
+  local viewer = require("review-diff")
   local data_dir
-  local bufnr
+  local view
 
   before_each(function()
-    original_get_current_view = diff.get_current_view
     data_dir = vim.fn.tempname()
     config.data_dir = data_dir
-    bufnr = vim.api.nvim_create_buf(false, true)
-    vim.bo[bufnr].swapfile = false
-    vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, { "one", "two", "three" })
-    diff.set_buf_side(bufnr, "new", { path = "lua/init.lua" }, "lua/init.lua")
+    view = viewer.open({
+      repo_root = vim.fn.getcwd(),
+      review_id = "HEAD..WORKTREE",
+      spec = { old = { kind = "ref", name = "HEAD" }, new = { kind = "worktree" } },
+      files = {
+        {
+          id = "lua/init.lua",
+          old_path = "lua/init.lua",
+          new_path = "lua/init.lua",
+          old_text = "one\ntwo\nthree",
+          new_text = "one\ntwo\nchanged",
+          status = "modified",
+        },
+      },
+    })
   end)
 
   after_each(function()
     session.reset()
-    diff.get_current_view = original_get_current_view
-    if vim.api.nvim_buf_is_valid(bufnr) then
-      vim.api.nvim_buf_delete(bufnr, { force = true })
+    if view then
+      view:close()
+      view = nil
     end
     vim.fn.delete(data_dir, "rf")
   end)
 
-  it("loads comments as extmarks for the active diff range", function()
-    local range = "HEAD..WORKDIR"
-    local _, err = storage.add_comment(range, {
+  it("loads comments as viewer annotations for the active review", function()
+    local _, err = storage.add_comment("HEAD..WORKTREE", {
       id = "comment-1",
       file = "lua/init.lua",
       side = "new",
-      line = 2,
+      line = 3,
       text = "Review this line.",
       created_at = "2026-07-26T00:00:00Z",
     })
     assert.is_nil(err)
 
-    diff.get_current_view = function()
-      return { rev_arg = range }
-    end
+    session.on_view_opened(view)
 
-    session.on_view_opened()
-
-    assert.are.equal(range, session.get_current_range())
-    local marks = vim.api.nvim_buf_get_extmarks(bufnr, config.ns, 0, -1, { details = true })
+    assert.are.equal("HEAD..WORKTREE", session.get_current_range())
+    local marks = vim.api.nvim_buf_get_extmarks(view.new_buf, view.annotation_ns, 0, -1, { details = true })
     assert.are.equal(1, #marks)
     assert.are.same({ { "Review this line.", "Comment" } }, marks[1][4].virt_text)
   end)
 
-  it("does not place comments outside the buffer", function()
-    session.place_extmark(bufnr, 10, "Out of range")
+  it("does not place direct extmarks outside the buffer", function()
+    session.place_extmark(view.new_buf, 100, "Out of range")
 
-    local marks = vim.api.nvim_buf_get_extmarks(bufnr, config.ns, 0, -1, {})
+    local marks = vim.api.nvim_buf_get_extmarks(view.new_buf, config.ns, 0, -1, {})
     assert.are.equal(0, #marks)
+  end)
+
+  it("reanchors comments from their saved context", function()
+    local _, err = storage.add_comment("HEAD..WORKTREE", {
+      id = "comment-anchor",
+      file = "lua/init.lua",
+      side = "new",
+      line = 2,
+      text = "Follow this line.",
+      context = "one\ntwo\nchanged",
+    })
+    assert.is_nil(err)
+
+    view:replace({
+      repo_root = vim.fn.getcwd(),
+      review_id = "HEAD..WORKTREE",
+      spec = { old = { kind = "ref", name = "HEAD" }, new = { kind = "worktree" } },
+      files = {
+        {
+          id = "lua/init.lua",
+          old_path = "lua/init.lua",
+          new_path = "lua/init.lua",
+          old_text = "one\ntwo\nthree",
+          new_text = "zero\none\ntwo\nchanged",
+          status = "modified",
+        },
+      },
+    })
+    assert.are.same(
+      { file = "lua/init.lua", side = "new", line = 3 },
+      view:resolve_location({ file = "lua/init.lua", side = "new", line = 2 }, "one\ntwo\nchanged")
+    )
+    session.on_view_opened(view)
+
+    local stored = storage.get_comments("HEAD..WORKTREE")
+    assert.are.equal(3, stored[1].line)
+    assert.is_false(session.is_stale("comment-anchor"))
   end)
 end)

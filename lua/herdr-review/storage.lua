@@ -3,13 +3,13 @@ local config = require("herdr-review.config")
 
 local M = {}
 
-local VERSION = 2
+local VERSION = 3
 local id_counter = 0
 
 ---@param range string
 ---@return table
 local function empty_session(range)
-  return { version = VERSION, range = range, comments = {} }
+  return { version = VERSION, review_id = range, comments = {} }
 end
 
 ---@param range string
@@ -37,6 +37,9 @@ local function validate_comment(comment, index)
   if type(comment.line) ~= "number" or comment.line < 1 then
     return string.format("comment %d has an invalid line", index)
   end
+  if comment.context_start ~= nil and (type(comment.context_start) ~= "number" or comment.context_start < 1) then
+    return string.format("comment %d has an invalid context_start", index)
+  end
   if type(comment.text) ~= "string" then
     return string.format("comment %d has no text", index)
   end
@@ -53,8 +56,8 @@ local function validate_session(range, data)
   if data.version ~= VERSION then
     return string.format("unsupported session version: %s", tostring(data.version))
   end
-  if data.range ~= range then
-    return "session range does not match the requested range"
+  if data.review_id ~= range then
+    return "session review_id does not match the requested review_id"
   end
   if type(data.comments) ~= "table" then
     return "session comments must be an array"

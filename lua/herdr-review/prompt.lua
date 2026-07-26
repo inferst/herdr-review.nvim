@@ -18,7 +18,7 @@ local function get_context_line(comment)
     return context_lines[1]
   end
 
-  local context_start = math.max(1, comment.line - CONTEXT_RADIUS)
+  local context_start = comment.context_start or math.max(1, comment.line - CONTEXT_RADIUS)
   local context_index = comment.line - context_start + 1
   return context_lines[context_index]
 end

@@ -1,48 +1,81 @@
 local config = require("herdr-review.config")
 local diff = require("herdr-review.diff")
-local paths = require("herdr-review.paths")
 local storage = require("herdr-review.storage")
+local viewer = require("review-diff")
 
 local M = {}
 
 local state = {
   current_range = nil,
+  current_view = nil,
+  stale_ids = {},
+  resolved_locations = {},
 }
 
----@param bufnr integer
----@param comments ReviewComment[]
----@param file string|nil
-local function apply_comments(bufnr, comments, file)
-  M.clear_extmarks(bufnr)
-  file = file or diff.get_buf_path(bufnr) or M.get_buf_file(bufnr)
-  if not file then
-    return
-  end
-
-  local side = diff.get_buf_side(bufnr)
-  for _, comment in ipairs(comments) do
-    if paths.equal(comment.file, file) and (not side or side == comment.side) then
-      M.place_extmark(bufnr, comment.line, comment.text)
-    end
-  end
-end
-
-local function clear_all_extmarks()
-  for _, bufnr in ipairs(vim.api.nvim_list_bufs()) do
-    if vim.api.nvim_buf_is_loaded(bufnr) then
-      M.clear_extmarks(bufnr)
-    end
-  end
-end
-
----@param message string
 local function report_storage_error(message)
   vim.notify(message, vim.log.levels.ERROR)
+end
+
+---@param view table
+---@return integer
+local function context_radius(view)
+  return view.get_context_radius and view:get_context_radius() or 3
+end
+
+---@param view table
+---@param comments ReviewComment[]
+---@param range string
+local function apply_comments(view, comments, range)
+  state.resolved_locations = {}
+  local locations = {}
+  local radius = context_radius(view)
+  for _, comment in ipairs(comments) do
+    local location = view:resolve_location(
+      { file = comment.file, side = comment.side, line = comment.line },
+      comment.context,
+      radius
+    )
+    locations[comment.id] = location
+    if location then
+      state.resolved_locations[comment.id] = location
+      view:expand_location(location)
+      if location.line ~= comment.line then
+        local context = view:get_context(location, radius)
+        storage.update_comment(range, comment.id, {
+          line = location.line,
+          context = context and table.concat(context, "\n") or comment.context,
+          context_start = math.max(1, location.line - radius),
+        })
+      end
+    end
+  end
+  view:render()
+
+  local annotations = {}
+  for _, comment in ipairs(comments) do
+    table.insert(annotations, {
+      id = comment.id,
+      location = locations[comment.id] or { file = comment.file, side = comment.side, line = nil },
+      text = comment.text,
+      hl_group = "Comment",
+    })
+  end
+  local result = view:set_annotations(annotations)
+  state.stale_ids = {}
+  for _, id in ipairs(result.stale) do
+    state.stale_ids[id] = true
+  end
 end
 
 ---@return string|nil
 function M.get_current_range()
   return state.current_range
+end
+
+---@return string|nil
+function M.get_commit_range()
+  local view = viewer.current()
+  return view and view:get_review_id() or nil
 end
 
 ---@param bufnr integer
@@ -63,82 +96,10 @@ function M.clear_extmarks(bufnr)
   vim.api.nvim_buf_clear_namespace(bufnr, config.ns, 0, -1)
 end
 
----@return string|nil
-function M.get_commit_range()
-  local view = diff.get_current_view()
-  if not view then
-    return nil
-  end
-
-  if view.rev_arg then
-    return view.rev_arg
-  end
-
-  local left = view.left
-  local right = view.right
-  if not left or not right then
-    return nil
-  end
-
-  local function revision_name(revision)
-    if revision.commit then
-      return string.sub(revision.commit, 1, 7)
-    end
-    if revision.type == 1 then
-      return "WORKDIR"
-    end
-    if revision.type == 3 then
-      return "INDEX"
-    end
-    return ""
-  end
-
-  local left_name = revision_name(left)
-  local right_name = revision_name(right)
-  if left_name == "" or right_name == "" then
-    return nil
-  end
-  return left_name .. ".." .. right_name
-end
-
----@param bufnr integer
----@return string|nil
-function M.get_buf_file(bufnr)
-  local name = vim.api.nvim_buf_get_name(bufnr)
-  if name == "" then
-    return nil
-  end
-
-  if name:sub(1, 11) == "diffview://" then
-    local git_pos = name:find("/.git/", 12, true)
-    if git_pos then
-      local rel_start = name:find("/", git_pos + 5, true)
-      if rel_start then
-        return name:sub(rel_start + 1)
-      end
-    end
-  end
-
-  local view = diff.get_current_view()
-  if not view then
-    return nil
-  end
-
-  local toplevel = ""
-  if view.adapter and view.adapter.ctx then
-    toplevel = view.adapter.ctx.toplevel or ""
-  end
-
-  if toplevel ~= "" and name:sub(1, #toplevel) == toplevel then
-    return name:sub(#toplevel + 2)
-  end
-
-  return name
-end
-
 ---@param range string
+---@param view table|nil
 ---@return boolean
-function M.load_session(range)
+function M.load_session(range, view)
   local comments, err = storage.get_comments(range)
   if not comments then
     report_storage_error(err)
@@ -146,59 +107,74 @@ function M.load_session(range)
   end
 
   state.current_range = range
-  for _, bufnr in ipairs(vim.api.nvim_list_bufs()) do
-    if vim.api.nvim_buf_is_loaded(bufnr) then
-      apply_comments(bufnr, comments)
-    end
+  state.current_view = view or viewer.current()
+  if state.current_view then
+    apply_comments(state.current_view, comments, range)
   end
   return true
 end
 
-function M.on_view_opened()
-  local range = M.get_commit_range()
+---@param view table|nil
+function M.on_view_opened(view)
+  view = view or viewer.current()
+  if not view then
+    return
+  end
+  local range = view:get_review_id()
   if not range then
     return
   end
-
   if state.current_range and range ~= state.current_range then
-    clear_all_extmarks()
     state.current_range = nil
+    state.stale_ids = {}
   end
-  M.load_session(range)
+  M.load_session(range, view)
 end
 
 ---@param bufnr integer
----@param file string|nil
-function M.on_buf_enter(bufnr, file)
-  local range = M.get_commit_range()
+---@param _file string|nil
+function M.on_buf_enter(bufnr, _file)
+  local view = viewer.current()
+  if not view then
+    return
+  end
+  diff.capture_buffer_context(bufnr)
+  local range = view:get_review_id()
   if range and state.current_range ~= range then
-    clear_all_extmarks()
-    state.current_range = nil
-    if not M.load_session(range) then
-      return
-    end
+    M.load_session(range, view)
   end
-
-  local active_range = range or state.current_range
-  if not active_range then
-    return
-  end
-
-  local comments, err = storage.get_comments(active_range)
-  if not comments then
-    report_storage_error(err)
-    return
-  end
-  apply_comments(bufnr, comments, file)
 end
 
 function M.reset()
   state.current_range = nil
-  clear_all_extmarks()
+  state.current_view = nil
+  state.stale_ids = {}
+  state.resolved_locations = {}
+  for _, bufnr in ipairs(vim.api.nvim_list_bufs()) do
+    if vim.api.nvim_buf_is_loaded(bufnr) then
+      M.clear_extmarks(bufnr)
+    end
+  end
 end
 
 function M.on_view_closed()
   M.reset()
+end
+
+---@param id string
+---@return boolean
+function M.is_stale(id)
+  return state.stale_ids[id] == true
+end
+
+---@param comment ReviewComment
+---@return table|nil
+function M.resolve_comment(comment)
+  if state.stale_ids[comment.id] then
+    return nil
+  end
+  return state.resolved_locations[comment.id]
+    or { file = comment.file, side = comment.side, line = comment.line }
 end
 
 return M

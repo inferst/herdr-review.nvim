@@ -3,7 +3,6 @@ local config = require("herdr-review.config")
 local diff = require("herdr-review.diff")
 local session = require("herdr-review.session")
 local storage = require("herdr-review.storage")
-local paths = require("herdr-review.paths")
 
 local M = {}
 
@@ -19,23 +18,11 @@ local function load_comments(range)
     notify_storage_error(err)
     return nil
   end
-  return comments.sort(stored)
-end
-
----@param file table|string|nil
----@param side "old"|"new"
----@return string|nil
-local function file_path_for_side(file, side)
-  if type(file) == "string" then
-    return file
+  local sorted = comments.sort(stored)
+  for _, comment in ipairs(sorted) do
+    comment.stale = session.is_stale(comment.id)
   end
-  if not file then
-    return nil
-  end
-  if side == "old" then
-    return file.oldpath or file.path
-  end
-  return file.path or file.oldpath
+  return sorted
 end
 
 ---@param text string
@@ -59,79 +46,28 @@ end
 ---@return string
 local function render_comment(comment, width)
   local marker = comment.side == "new" and "+" or "−"
-  local prefix = string.format("%s:%s  %s  ", comment.file, comment.line, marker)
+  local stale = comment.stale and " [stale]" or ""
+  local prefix = string.format("%s:%s  %s%s  ", comment.file, comment.line, marker, stale)
   local text_width = width - vim.fn.strdisplaywidth(prefix)
   local text = truncate_text(comment.text, text_width)
   return truncate_text(prefix, width - vim.fn.strdisplaywidth(text)) .. text
 end
 
 ---@param comment ReviewComment
----@param view table
----@return string|nil
-local function entry_path_for_comment(comment, view)
-  for _, file in view.files:iter() do
-    local path = file_path_for_side(file, comment.side)
-    if paths.equal(path, comment.file) then
-      return file.path
-    end
-  end
-  return nil
-end
-
----@param view table
----@param side "old"|"new"
----@return table|nil
-local function panel_for_side(view, side)
-  if not view or not view.cur_layout then
-    return nil
-  end
-  return side == "new" and view.cur_layout.b or view.cur_layout.a
-end
-
----@param comment ReviewComment
 function M.jump_to_comment(comment)
-  local target_file = paths.normalize(comment.file)
-  if not target_file then
-    return
-  end
-
-  local function focus_win(win_id)
-    vim.api.nvim_set_current_win(win_id)
-    pcall(vim.api.nvim_win_set_cursor, win_id, { comment.line, 0 })
-  end
-
   local view = diff.get_current_view()
   if not view then
     vim.notify("No diff view open", vim.log.levels.WARN)
     return
   end
-
-  local panel = panel_for_side(view, comment.side)
-  if panel and panel.id and vim.api.nvim_win_is_valid(panel.id) then
-    local panel_file = panel.file
-    local panel_path = file_path_for_side(panel_file, comment.side)
-    if paths.equal(panel_path, target_file) then
-      focus_win(panel.id)
-      return
-    end
-  end
-
-  local entry_path = entry_path_for_comment(comment, view)
-  if not entry_path then
-    vim.notify("Could not find file " .. target_file, vim.log.levels.WARN)
+  local location = session.resolve_comment(comment)
+  if not location then
     return
   end
-
-  local future = view:set_file_by_path(entry_path, false, false)
-  future:finally(function()
-    local current_view = diff.get_current_view()
-    local current_panel = panel_for_side(current_view, comment.side)
-    if not current_panel or not current_panel.id or not vim.api.nvim_win_is_valid(current_panel.id) then
-      vim.notify("Could not find window for " .. target_file, vim.log.levels.WARN)
-      return
-    end
-    focus_win(current_panel.id)
-  end)
+  local ok, err = view:open_location(location)
+  if not ok then
+    vim.notify(err or "Could not find comment location", vim.log.levels.WARN)
+  end
 end
 
 function M.open_list()

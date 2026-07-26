@@ -22,9 +22,10 @@ local function load_comments(range)
 end
 
 function M.create_comment()
+  local view = diff.get_current_view()
   local file, side, line = diff.get_cursor_context()
-  if not file or not side or not line then
-    vim.notify("Not in a diff view", vim.log.levels.WARN)
+  if not view or not file or not side or not line then
+    vim.notify("Not on a source line in the review", vim.log.levels.WARN)
     return
   end
 
@@ -49,9 +50,10 @@ function M.create_comment()
       return
     end
 
-    local bufnr = vim.api.nvim_get_current_buf()
-    local context_lines = diff.get_context(bufnr, line, 3)
+    local radius = view:get_context_radius()
+    local context_lines = view:get_context({ file = file, side = side, line = line }, radius) or {}
     local context = table.concat(context_lines, "\n")
+    local context_start = math.max(1, line - radius)
 
     local data
     local err
@@ -59,6 +61,7 @@ function M.create_comment()
       data, err = storage.update_comment(range, existing_comment.id, {
         text = text,
         context = context,
+        context_start = context_start,
       })
     else
       data, err = storage.add_comment(range, {
@@ -68,6 +71,7 @@ function M.create_comment()
         line = line,
         text = text,
         context = context,
+        context_start = context_start,
         created_at = os.date("!%Y-%m-%dT%H:%M:%SZ"),
       })
     end

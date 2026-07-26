@@ -7,6 +7,7 @@ local M = {}
 ---@field line integer
 ---@field text string
 ---@field context string|nil
+---@field context_start integer|nil
 ---@field created_at string
 
 ---@param comment ReviewComment
