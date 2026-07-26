@@ -65,24 +65,43 @@ function M.create_comment()
   end)
 end
 
-local function wrap_text(text, max_width)
-  local result = {}
-  while #text > 0 do
-    if #text <= max_width then
-      table.insert(result, text)
-      break
-    end
-    local sub = text:sub(1, max_width + 1)
-    local space = sub:match("^.*()%s")
-    if space and space > 1 then
-      table.insert(result, text:sub(1, space - 1))
-      text = text:sub(space + 1)
-    else
-      table.insert(result, text:sub(1, max_width))
-      text = text:sub(max_width + 1)
-    end
+local function truncate_text(text, max_width)
+  if max_width <= 0 then
+    return ""
   end
-  return result
+  if vim.fn.strdisplaywidth(text) <= max_width then
+    return text
+  end
+  if max_width == 1 then
+    return "…"
+  end
+  return vim.fn.strcharpart(text, 0, max_width - 1) .. "…"
+end
+
+local function sorted_comments(range)
+  local comments = storage.get_comments(range)
+  table.sort(comments, function(a, b)
+    local a_file = a.file or a.file_new or a.file_old or ""
+    local b_file = b.file or b.file_new or b.file_old or ""
+    if a_file ~= b_file then
+      return a_file < b_file
+    end
+
+    local a_side = a.side == "old" and 1 or 2
+    local b_side = b.side == "old" and 1 or 2
+    if a_side ~= b_side then
+      return a_side < b_side
+    end
+
+    local a_line = a.side == "new" and a.line_new or a.line_old or math.huge
+    local b_line = b.side == "new" and b.line_new or b.line_old or math.huge
+    if a_line ~= b_line then
+      return a_line < b_line
+    end
+
+    return (a.id or "") < (b.id or "")
+  end)
+  return comments
 end
 
 function M.open_list()
@@ -92,49 +111,26 @@ function M.open_list()
     return
   end
 
-  local comments = storage.get_comments(range)
+  local comments = sorted_comments(range)
   if #comments == 0 then
     vim.notify("No comments", vim.log.levels.INFO)
     return
   end
 
   local list_width = config.list_width
-  local text_width = list_width - 6
-  local lines = {}
-  local row_to_idx = {}
-
-  table.insert(lines, string.format("─── Review: %s ─── %d comments ───", range, #comments))
-  table.insert(lines, "")
-
-  for i, c in ipairs(comments) do
-    local file = c.file
-    if c.file_old and c.file_old ~= c.file then
-      file = c.file_old .. " → " .. c.file
-    end
-    local line_num = c.side == "new" and c.line_new or c.line_old
-    local header = string.format("  %d  %s:%d (%s)", i, file, line_num, c.side)
-    table.insert(lines, header)
-    row_to_idx[#lines] = i
-
-    local wrapped = wrap_text(c.text, text_width)
-    for _, chunk in ipairs(wrapped) do
-      table.insert(lines, "    " .. chunk)
-      row_to_idx[#lines] = i
-    end
-  end
-
-  table.insert(lines, "")
-  table.insert(lines, "  [e]dit  [d]elete  [⏎]jump  [q]close")
+  local width = math.min(list_width, vim.o.columns - 4)
 
   local buf = vim.api.nvim_create_buf(false, true)
-  vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
-  vim.bo[buf].modifiable = false
+  vim.bo[buf].bufhidden = "wipe"
+  vim.bo[buf].buftype = "nofile"
   vim.bo[buf].filetype = "herdr-review-list"
+  vim.bo[buf].swapfile = false
 
-  local width = math.min(list_width, vim.o.columns - 4)
-  local height = math.min(#lines, vim.o.lines - 4)
-  height = math.max(height, 5)
+  local function window_height()
+    return math.max(1, math.min(#comments, vim.o.lines - 4))
+  end
 
+  local height = window_height()
   local row = math.floor((vim.o.lines - height) / 2)
   local col = math.floor((vim.o.columns - width) / 2)
 
@@ -146,22 +142,84 @@ function M.open_list()
     col = col,
     style = "minimal",
     border = "rounded",
-    title = " Review Comments ",
+    title = string.format(" Comments · %d ", #comments),
     title_pos = "center",
   })
 
-  local function cursor_idx()
-    local cursor = vim.api.nvim_win_get_cursor(win)
-    for r = cursor[1], 1, -1 do
-      if row_to_idx[r] then
-        return row_to_idx[r]
+  vim.wo[win].cursorline = true
+  vim.wo[win].cursorlineopt = "line"
+  vim.wo[win].wrap = false
+  vim.wo[win].number = false
+  vim.wo[win].relativenumber = false
+  vim.wo[win].signcolumn = "no"
+
+  local function render(selected_id, selected_row)
+    comments = sorted_comments(range)
+    if #comments == 0 then
+      if vim.api.nvim_win_is_valid(win) then
+        vim.api.nvim_win_close(win, true)
+      end
+      vim.notify("No comments", vim.log.levels.INFO)
+      return
+    end
+    if not vim.api.nvim_win_is_valid(win) or not vim.api.nvim_buf_is_valid(buf) then
+      return
+    end
+
+    local lines = {}
+    for _, c in ipairs(comments) do
+      local file
+      if c.side == "old" then
+        file = c.file_old or c.file or c.file_new
+      else
+        file = c.file_new or c.file
+      end
+      file = file or "?"
+
+      local line_num = c.side == "new" and c.line_new or c.line_old
+      local marker = c.side == "new" and "+" or "−"
+      local prefix = string.format("%s:%s  %s  ", file, line_num or "?", marker)
+      local text_width = width - vim.fn.strdisplaywidth(prefix)
+      local text = truncate_text(c.text or "", text_width)
+      table.insert(lines, truncate_text(prefix, width - vim.fn.strdisplaywidth(text)) .. text)
+    end
+
+    vim.bo[buf].modifiable = true
+    vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
+    vim.bo[buf].modifiable = false
+
+    vim.api.nvim_win_set_config(win, { title = string.format(" Comments · %d ", #comments) })
+    vim.api.nvim_win_set_height(win, window_height())
+
+    local cursor_row = selected_row or 1
+    if selected_id then
+      for i, c in ipairs(comments) do
+        if c.id == selected_id then
+          cursor_row = i
+          break
+        end
       end
     end
-    return nil
+    cursor_row = math.max(1, math.min(cursor_row, #comments))
+    vim.api.nvim_win_set_cursor(win, { cursor_row, 0 })
+  end
+
+  local function cursor_idx()
+    return vim.api.nvim_win_get_cursor(win)[1]
+  end
+
+  local function close()
+    if vim.api.nvim_win_is_valid(win) then
+      vim.api.nvim_win_close(win, true)
+    end
   end
 
   vim.keymap.set("n", "q", function()
-    vim.api.nvim_win_close(win, true)
+    close()
+  end, { buffer = buf })
+
+  vim.keymap.set("n", "<Esc>", function()
+    close()
   end, { buffer = buf })
 
   vim.keymap.set("n", "<CR>", function()
@@ -170,7 +228,7 @@ function M.open_list()
       return
     end
     local c = comments[idx]
-    vim.api.nvim_win_close(win, true)
+    close()
     M.jump_to_comment(c)
   end, { buffer = buf })
 
@@ -180,7 +238,9 @@ function M.open_list()
       return
     end
     local c = comments[idx]
-    M.edit_comment(range, c, win, comments)
+    M.edit_comment(range, c, win, function(selected_id)
+      render(selected_id)
+    end)
   end, { buffer = buf })
 
   vim.keymap.set("n", "d", function()
@@ -191,9 +251,10 @@ function M.open_list()
     local c = comments[idx]
     storage.delete_comment(range, c.id)
     session.load_session(range)
-    vim.api.nvim_win_close(win, true)
-    M.open_list()
+    render(nil, math.min(idx, #comments - 1))
   end, { buffer = buf })
+
+  render()
 end
 
 ---@param comment table
@@ -270,16 +331,20 @@ end
 ---@param range string
 ---@param comment table
 ---@param list_win integer
----@param comments table[]
-function M.edit_comment(range, comment, list_win, comments)
+---@param refresh fun(selected_id: string)|nil
+function M.edit_comment(range, comment, list_win, refresh)
   vim.ui.input({ prompt = "Edit comment: ", default = comment.text }, function(text)
     if not text or text == "" then
       return
     end
     storage.update_comment(range, comment.id, { text = text })
     session.load_session(range)
-    vim.api.nvim_win_close(list_win, true)
-    M.open_list()
+    if refresh then
+      refresh(comment.id)
+    elseif vim.api.nvim_win_is_valid(list_win) then
+      vim.api.nvim_win_close(list_win, true)
+      M.open_list()
+    end
   end)
 end
 

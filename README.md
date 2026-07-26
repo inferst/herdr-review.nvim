@@ -8,7 +8,7 @@ Leave comments on diff lines, review them in a floating window, and send to a he
 
 - Comment on any line in Diffview (old or new side)
 - Virtual text shows comments inline in the diff buffer
-- Floating window with full comment list, navigation, and CRUD
+- Picker-style floating window with highlighted comment selection and CRUD
 - Send all comments to a herdr agent in one batch
 - Comments persist between sessions (loaded by commit range)
 
@@ -57,6 +57,7 @@ Leave comments on diff lines, review them in a floating window, and send to a he
 | `e` | Edit comment |
 | `d` | Delete comment |
 | `q` | Close window |
+| `<Esc>` | Close window |
 
 ## Configuration
 
