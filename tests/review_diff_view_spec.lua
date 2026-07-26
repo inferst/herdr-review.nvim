@@ -35,6 +35,40 @@ describe("review diff view", function()
     assert.are.equal("    2 │ three", vim.api.nvim_buf_get_lines(view.new_buf, 2, 3, false)[1])
   end)
 
+  it("extends line highlights across the screen line", function()
+    local render_ns = vim.api.nvim_create_namespace("review-diff-render")
+    local cursorline_ns = vim.api.nvim_create_namespace("review-diff-cursorline")
+    view = viewer.open({
+      repo_root = vim.fn.getcwd(),
+      review_id = "review-line-highlight",
+      spec = { old = { kind = "ref", name = "HEAD" }, new = { kind = "worktree" } },
+      files = {
+        {
+          old_path = "lua/example.lua",
+          new_path = "lua/example.lua",
+          old_text = "one\ntwo",
+          new_text = "one\nthree",
+          status = "modified",
+        },
+      },
+    })
+
+    local marks = vim.api.nvim_buf_get_extmarks(view.new_buf, render_ns, 0, -1, { details = true })
+    local changed_line_details
+    for _, mark in ipairs(marks) do
+      if mark[2] == 2 then
+        changed_line_details = mark[4]
+        break
+      end
+    end
+
+    assert.are.same("ReviewDiffChange", changed_line_details.line_hl_group)
+
+    local cursorline_marks = vim.api.nvim_buf_get_extmarks(view.new_buf, cursorline_ns, 0, -1, { details = true })
+    assert.are.same(1, #cursorline_marks)
+    assert.are.same("CursorLine", cursorline_marks[1][4].line_hl_group)
+  end)
+
   it("projects Tree-sitter highlights into the aggregate buffers", function()
     local parser_available = pcall(vim.treesitter.get_parser, 0, "lua")
     local syntax_ns = vim.api.nvim_create_namespace("review-diff-syntax")

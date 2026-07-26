@@ -7,6 +7,7 @@ local M = {}
 local render_ns = vim.api.nvim_create_namespace("review-diff-render")
 local annotation_ns = vim.api.nvim_create_namespace("review-diff-annotations")
 local syntax_ns = vim.api.nvim_create_namespace("review-diff-syntax")
+local cursorline_ns = vim.api.nvim_create_namespace("review-diff-cursorline")
 local active_view
 local view_counter = 0
 
@@ -269,7 +270,9 @@ function View:render()
     for index, row in ipairs(self.display_rows) do
       local line_hl, inline = render.highlight(row, side, self.options)
       if line_hl then
-        vim.api.nvim_buf_add_highlight(bufnr, render_ns, line_hl, index - 1, 0, -1)
+        vim.api.nvim_buf_set_extmark(bufnr, render_ns, index - 1, 0, {
+          line_hl_group = line_hl,
+        })
       end
       if inline then
         vim.api.nvim_buf_add_highlight(bufnr, render_ns, "ReviewDiffText", index - 1, inline.start, inline.finish)
@@ -279,7 +282,26 @@ function View:render()
   self.rendering = false
   self:apply_syntax()
   self:apply_annotations()
+  self:update_cursorline()
   self:emit("rendered")
+end
+
+function View:update_cursorline()
+  for _, side in ipairs({ "old", "new" }) do
+    local bufnr = self[side .. "_buf"]
+    vim.api.nvim_buf_clear_namespace(bufnr, cursorline_ns, 0, -1)
+
+    local win = self[side .. "_win"]
+    if valid_window(win) and vim.wo[win].cursorline then
+      local row = vim.api.nvim_win_get_cursor(win)[1] - 1
+      if row >= 0 and row < vim.api.nvim_buf_line_count(bufnr) then
+        vim.api.nvim_buf_set_extmark(bufnr, cursorline_ns, row, 0, {
+          line_hl_group = "CursorLine",
+          priority = 10000,
+        })
+      end
+    end
+  end
 end
 
 function View:apply_annotations()
@@ -533,6 +555,7 @@ function View:set_cursor_row(row_index)
       vim.api.nvim_win_set_cursor(win, { row_index, math.min(current_cursor[2], 0) })
     end
   end
+  self:update_cursorline()
 end
 
 function View:toggle_file_at_cursor()
@@ -858,6 +881,7 @@ local function setup_autocmds(view)
       callback = function()
         if not view.closed and not view.rendering then
           view:sync_cursor()
+          view:update_cursorline()
           view:emit("cursor_moved", view:get_cursor_location())
         end
       end,
