@@ -8,23 +8,35 @@ describe("herdr prompt", function()
         side = "old",
         line = 109,
         text = "Test comment 1",
-        context = "        // A broken Plugin is isolated to its own status. Startup must still",
+        context = table.concat({
+          "old line 106",
+          "old line 107",
+          "old line 108",
+          "        // A broken Plugin is isolated to its own status. Startup must still",
+          "old line 110",
+          "old line 111",
+          "old line 112",
+        }, "\n"),
       },
       {
         file = "crates/plugin/src/runtime.rs",
         side = "new",
         line = 118,
         text = "Test comment 2",
-        context = "    // Test changes in file",
+        context = table.concat({
+          "new line 115",
+          "new line 116",
+          "new line 117",
+          "    // Test changes in file",
+          "new line 119",
+          "new line 120",
+          "new line 121",
+        }, "\n"),
       },
     })
 
     assert.are.equal(
       table.concat({
-        "You are reviewing code. Here are the review comments for this diff.",
-        "",
-        "Diff range: HEAD..WORKDIR",
-        "",
         "crates/plugin/src/runtime.rs:109 (removed)",
         "-        // A broken Plugin is isolated to its own status. Startup must still",
         "Test comment 1",
@@ -32,8 +44,6 @@ describe("herdr prompt", function()
         "crates/plugin/src/runtime.rs:118",
         "+    // Test changes in file",
         "Test comment 2",
-        "",
-        "Please fix all issues mentioned above.",
       }, "\n"),
       prompt
     )

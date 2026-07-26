@@ -1,28 +1,45 @@
 local M = {}
 
+local CONTEXT_RADIUS = 3
+
+---@param comment ReviewComment
+---@return string|nil
+local function get_context_line(comment)
+  if not comment.context or comment.context == "" then
+    return nil
+  end
+
+  local context_lines = {}
+  for context_line in (comment.context .. "\n"):gmatch("(.-)\n") do
+    table.insert(context_lines, context_line)
+  end
+
+  if #context_lines == 1 then
+    return context_lines[1]
+  end
+
+  local context_start = math.max(1, comment.line - CONTEXT_RADIUS)
+  local context_index = comment.line - context_start + 1
+  return context_lines[context_index]
+end
+
 ---@param lines string[]
 ---@param comment ReviewComment
 local function append_context(lines, comment)
-  if not comment.context or comment.context == "" then
+  local context_line = get_context_line(comment)
+  if not context_line then
     return
   end
 
   local marker = comment.side == "old" and "-" or "+"
-  for context_line in (comment.context .. "\n"):gmatch("(.-)\n") do
-    table.insert(lines, marker .. context_line)
-  end
+  table.insert(lines, marker .. context_line)
 end
 
----@param range string
+---@param _range string
 ---@param comments ReviewComment[]
 ---@return string
-function M.build(range, comments)
-  local lines = {
-    "You are reviewing code. Here are the review comments for this diff.",
-    "",
-    "Diff range: " .. range,
-    "",
-  }
+function M.build(_range, comments)
+  local lines = {}
 
   for index, comment in ipairs(comments) do
     if index > 1 then
@@ -34,9 +51,6 @@ function M.build(range, comments)
     append_context(lines, comment)
     table.insert(lines, comment.text)
   end
-
-  table.insert(lines, "")
-  table.insert(lines, "Please fix all issues mentioned above.")
 
   return table.concat(lines, "\n")
 end
