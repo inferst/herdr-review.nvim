@@ -203,35 +203,11 @@ function M.jump_to_comment(comment)
     return
   end
 
-  local match_file = comment.side == "new" and comment.file_new or comment.file_old
-  if not match_file then
-    match_file = comment.file_new
-  end
-
   local function strip_path(p)
     return p:sub(1, 2) == "./" and p:sub(3) or p
   end
 
   target_file = strip_path(target_file)
-  match_file = strip_path(match_file)
-
-  local function panel_win(view)
-    if not view or not view.cur_layout then
-      return nil
-    end
-    local panel = comment.side == "new" and view.cur_layout.b or view.cur_layout.a
-    if not panel or not panel.id then
-      return nil
-    end
-    local panel_path = panel.file and (type(panel.file) == "string" and panel.file or panel.file.path)
-    if not panel_path then
-      return nil
-    end
-    if strip_path(panel_path) ~= match_file then
-      return nil
-    end
-    return panel.id
-  end
 
   local function focus_win(win_id)
     vim.api.nvim_set_current_win(win_id)
@@ -241,36 +217,54 @@ function M.jump_to_comment(comment)
     end
   end
 
-  local view = diff.get_current_view()
-  local wid = view and panel_win(view)
-  if wid then
-    focus_win(wid)
-    return
-  end
-
-  if view and view.set_file_by_path then
-    view:set_file_by_path(target_file, true, true)
-
-    local function try_focus(attempts)
-      if attempts <= 0 then
-        vim.notify("Could not find window for " .. target_file, vim.log.levels.WARN)
-        return
-      end
-      vim.schedule(function()
-        local w = panel_win(diff.get_current_view())
-        if w then
-          focus_win(w)
-        else
-          try_focus(attempts - 1)
-        end
-      end)
+  local function layout_panel(view)
+    if not view or not view.cur_layout then
+      return nil
     end
+    return comment.side == "new" and view.cur_layout.b or view.cur_layout.a
+  end
 
-    try_focus(10)
+  local function find_entry(view)
+    for _, file in view.files:iter() do
+      local fp = type(file.path) == "string" and file.path or tostring(file.path)
+      if strip_path(fp) == target_file then
+        return file
+      end
+    end
+    return nil
+  end
+
+  local view = diff.get_current_view()
+  if not view then
+    vim.notify("No diff view open", vim.log.levels.WARN)
     return
   end
 
-  vim.notify("Could not find window for " .. target_file, vim.log.levels.WARN)
+  local panel = layout_panel(view)
+  if panel and panel.id and vim.api.nvim_win_is_valid(panel.id) then
+    local fp = panel.file and (type(panel.file) == "string" and panel.file or panel.file.path)
+    if fp and strip_path(fp) == target_file then
+      focus_win(panel.id)
+      return
+    end
+  end
+
+  local file = find_entry(view)
+  if not file then
+    vim.notify("Could not find file " .. target_file, vim.log.levels.WARN)
+    return
+  end
+
+  local future = view:set_file_by_path(target_file, false, false)
+  future:finally(function()
+    local current_view = diff.get_current_view()
+    local panel = layout_panel(current_view)
+    if not panel or not panel.id or not vim.api.nvim_win_is_valid(panel.id) then
+      vim.notify("Could not find window for " .. target_file, vim.log.levels.WARN)
+      return
+    end
+    focus_win(panel.id)
+  end)
 end
 
 ---@param range string

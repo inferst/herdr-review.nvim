@@ -17,11 +17,14 @@ local function apply_comments(bufnr, comments, file)
   file = file or diff.get_buf_path(bufnr) or M.get_buf_file(bufnr)
   if not file then return end
   file = path_strip_prefix(file)
+  local buf_side = diff.get_buf_side(bufnr)
   for _, c in ipairs(comments) do
     if path_strip_prefix(c.file) == file then
-      local line = c.side == "new" and c.line_new or c.line_old
-      if line then
-        M.place_extmark(bufnr, line, c.text)
+      if not buf_side or buf_side == c.side then
+        local line = c.side == "new" and c.line_new or c.line_old
+        if line then
+          M.place_extmark(bufnr, line, c.text)
+        end
       end
     end
   end
@@ -31,6 +34,9 @@ end
 ---@param line integer
 ---@param text string
 function M.place_extmark(bufnr, line, text)
+  if line < 1 or line > vim.api.nvim_buf_line_count(bufnr) then
+    return
+  end
   vim.api.nvim_buf_set_extmark(bufnr, config.ns, line - 1, 0, {
     virt_text = { { text, "Comment" } },
     virt_text_pos = "eol",
