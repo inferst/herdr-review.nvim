@@ -12,7 +12,10 @@ local STATUS_LABELS = {
 }
 
 local function side_path(file, side)
-  return side == "old" and file.old_path or file.new_path
+  if side == "old" then
+    return file.old_path
+  end
+  return file.new_path
 end
 
 local function path_label(file, side)
@@ -103,8 +106,15 @@ function M.text(row, side)
   end
 
   local source_row = row.source_row
-  local line = side == "old" and source_row.old_line or source_row.new_line
-  local text = side == "old" and source_row.old_text or source_row.new_text
+  local line
+  local text
+  if side == "old" then
+    line = source_row.old_line
+    text = source_row.old_text
+  else
+    line = source_row.new_line
+    text = source_row.new_text
+  end
   local prefix = line and string.format("%5d │ ", line) or "      │ "
   return prefix .. (text or "")
 end
@@ -127,7 +137,12 @@ function M.highlight(row, side)
   end
 
   local source_row = row.source_row
-  local line_text = side == "old" and source_row.old_text or source_row.new_text
+  local line_text
+  if side == "old" then
+    line_text = source_row.old_text
+  else
+    line_text = source_row.new_text
+  end
   local line_hl
   if source_row.kind == "add" and side == "new" then
     line_hl = "ReviewDiffAdd"
@@ -148,7 +163,12 @@ function M.highlight(row, side)
     return line_hl, nil
   end
 
-  local line = side == "old" and source_row.old_line or source_row.new_line
+  local line
+  if side == "old" then
+    line = source_row.old_line
+  else
+    line = source_row.new_line
+  end
   local prefix_width = line and #string.format("%5d │ ", line) or #"      │ "
   if side == "old" then
     return line_hl, { start = prefix_width + range.old_start, finish = prefix_width + range.old_end }

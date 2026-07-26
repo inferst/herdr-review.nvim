@@ -35,6 +35,29 @@ describe("review diff view", function()
     assert.are.equal("    2 │ three", vim.api.nvim_buf_get_lines(view.new_buf, 2, 3, false)[1])
   end)
 
+  it("keeps the old side empty for an added file", function()
+    view = viewer.open({
+      repo_root = vim.fn.getcwd(),
+      review_id = "review-added",
+      spec = { old = { kind = "ref", name = "HEAD" }, new = { kind = "worktree" } },
+      files = {
+        {
+          old_path = nil,
+          new_path = "lua/added.lua",
+          old_text = nil,
+          new_text = "one\ntwo",
+          status = "added",
+        },
+      },
+    })
+
+    assert.are.equal("▼ A —", vim.api.nvim_buf_get_lines(view.old_buf, 0, 1, false)[1])
+    assert.are.equal("▼ A lua/added.lua", vim.api.nvim_buf_get_lines(view.new_buf, 0, 1, false)[1])
+    assert.are.equal("      │ ", vim.api.nvim_buf_get_lines(view.old_buf, 1, 2, false)[1])
+    assert.are.equal("    1 │ one", vim.api.nvim_buf_get_lines(view.new_buf, 1, 2, false)[1])
+    assert.is_nil(view:resolve_location({ file = "lua/added.lua", side = "old", line = 1 }))
+  end)
+
   it("maps the active cursor to a side-specific source location", function()
     view = viewer.open({
       repo_root = vim.fn.getcwd(),

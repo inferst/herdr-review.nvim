@@ -86,7 +86,12 @@ local function file_for_location(files, location)
     return nil
   end
   for _, file in ipairs(files) do
-    local path = location.side == "old" and file.old_path or file.new_path
+    local path
+    if location.side == "old" then
+      path = file.old_path
+    else
+      path = file.new_path
+    end
     if same_path(path, location.file) then
       return file
     end
@@ -95,7 +100,10 @@ local function file_for_location(files, location)
 end
 
 local function location_path(file, side)
-  return side == "old" and file.old_path or file.new_path
+  if side == "old" then
+    return file.old_path
+  end
+  return file.new_path
 end
 
 local function file_metadata(file)
