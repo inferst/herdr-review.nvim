@@ -1,33 +1,48 @@
 local config = require("herdr-review.config")
 local diff = require("herdr-review.diff")
+local paths = require("herdr-review.paths")
 local storage = require("herdr-review.storage")
 
 local M = {}
 
----@type string|nil
-M.current_range = nil
+local state = {
+  current_range = nil,
+}
 
-local function path_strip_prefix(p)
-  if p:sub(1, 2) == "./" then return p:sub(3) end
-  return p
-end
-
+---@param bufnr integer
+---@param comments ReviewComment[]
+---@param file string|nil
 local function apply_comments(bufnr, comments, file)
   M.clear_extmarks(bufnr)
   file = file or diff.get_buf_path(bufnr) or M.get_buf_file(bufnr)
-  if not file then return end
-  file = path_strip_prefix(file)
-  local buf_side = diff.get_buf_side(bufnr)
-  for _, c in ipairs(comments) do
-    if path_strip_prefix(c.file) == file then
-      if not buf_side or buf_side == c.side then
-        local line = c.side == "new" and c.line_new or c.line_old
-        if line then
-          M.place_extmark(bufnr, line, c.text)
-        end
-      end
+  if not file then
+    return
+  end
+
+  local side = diff.get_buf_side(bufnr)
+  for _, comment in ipairs(comments) do
+    if paths.equal(comment.file, file) and (not side or side == comment.side) then
+      M.place_extmark(bufnr, comment.line, comment.text)
     end
   end
+end
+
+local function clear_all_extmarks()
+  for _, bufnr in ipairs(vim.api.nvim_list_bufs()) do
+    if vim.api.nvim_buf_is_loaded(bufnr) then
+      M.clear_extmarks(bufnr)
+    end
+  end
+end
+
+---@param message string
+local function report_storage_error(message)
+  vim.notify(message, vim.log.levels.ERROR)
+end
+
+---@return string|nil
+function M.get_current_range()
+  return state.current_range
 end
 
 ---@param bufnr integer
@@ -61,35 +76,29 @@ function M.get_commit_range()
 
   local left = view.left
   local right = view.right
-
   if not left or not right then
     return nil
   end
 
-  local left_str = ""
-  local right_str = ""
-
-  if left.commit then
-    left_str = string.sub(left.commit, 1, 7)
-  elseif left.type == 1 then
-    left_str = "WORKDIR"
-  elseif left.type == 3 then
-    left_str = "INDEX"
+  local function revision_name(revision)
+    if revision.commit then
+      return string.sub(revision.commit, 1, 7)
+    end
+    if revision.type == 1 then
+      return "WORKDIR"
+    end
+    if revision.type == 3 then
+      return "INDEX"
+    end
+    return ""
   end
 
-  if right.commit then
-    right_str = string.sub(right.commit, 1, 7)
-  elseif right.type == 1 then
-    right_str = "WORKDIR"
-  elseif right.type == 3 then
-    right_str = "INDEX"
-  end
-
-  if left_str == "" or right_str == "" then
+  local left_name = revision_name(left)
+  local right_name = revision_name(right)
+  if left_name == "" or right_name == "" then
     return nil
   end
-
-  return left_str .. ".." .. right_str
+  return left_name .. ".." .. right_name
 end
 
 ---@param bufnr integer
@@ -128,59 +137,68 @@ function M.get_buf_file(bufnr)
 end
 
 ---@param range string
+---@return boolean
 function M.load_session(range)
-  M.current_range = range
-  local comments = storage.get_comments(range)
+  local comments, err = storage.get_comments(range)
+  if not comments then
+    report_storage_error(err)
+    return false
+  end
+
+  state.current_range = range
   for _, bufnr in ipairs(vim.api.nvim_list_bufs()) do
     if vim.api.nvim_buf_is_loaded(bufnr) then
       apply_comments(bufnr, comments)
     end
   end
+  return true
 end
 
 function M.on_view_opened()
   local range = M.get_commit_range()
-  if not range then return end
-
-  if M.current_range and range ~= M.current_range then
-    for _, bufnr in ipairs(vim.api.nvim_list_bufs()) do
-      if vim.api.nvim_buf_is_loaded(bufnr) then
-        M.clear_extmarks(bufnr)
-      end
-    end
-  end
-
-  M.load_session(range)
-end
-
-function M.on_buf_enter(bufnr, file)
-  local range = M.get_commit_range()
-
-  if range then
-    if M.current_range ~= range then
-      for _, b in ipairs(vim.api.nvim_list_bufs()) do
-        if vim.api.nvim_buf_is_loaded(b) then
-          M.clear_extmarks(b)
-        end
-      end
-      M.load_session(range)
-    end
-    apply_comments(bufnr, storage.get_comments(range), file)
+  if not range then
     return
   end
 
-  if M.current_range then
-    apply_comments(bufnr, storage.get_comments(M.current_range), file)
+  if state.current_range and range ~= state.current_range then
+    clear_all_extmarks()
+    state.current_range = nil
   end
+  M.load_session(range)
+end
+
+---@param bufnr integer
+---@param file string|nil
+function M.on_buf_enter(bufnr, file)
+  local range = M.get_commit_range()
+  if range and state.current_range ~= range then
+    clear_all_extmarks()
+    state.current_range = nil
+    if not M.load_session(range) then
+      return
+    end
+  end
+
+  local active_range = range or state.current_range
+  if not active_range then
+    return
+  end
+
+  local comments, err = storage.get_comments(active_range)
+  if not comments then
+    report_storage_error(err)
+    return
+  end
+  apply_comments(bufnr, comments, file)
+end
+
+function M.reset()
+  state.current_range = nil
+  clear_all_extmarks()
 end
 
 function M.on_view_closed()
-  M.current_range = nil
-  for _, bufnr in ipairs(vim.api.nvim_list_bufs()) do
-    if vim.api.nvim_buf_is_loaded(bufnr) then
-      M.clear_extmarks(bufnr)
-    end
-  end
+  M.reset()
 end
 
 return M

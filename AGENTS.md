@@ -8,20 +8,30 @@ This repository is a Neovim plugin written in Lua. The runtime source is in
 - `init.lua` registers setup, keymaps, and Diffview autocmds.
 - `config.lua` contains defaults and shared constants.
 - `diff.lua` integrates with Diffview and maps buffers to diff sides.
+- `comments.lua`, `paths.lua`, and `prompt.lua` contain pure review logic.
 - `session.lua` manages review ranges and virtual-text extmarks.
 - `storage.lua` persists comments as JSON.
-- `ui.lua` implements comment input, the floating comment list, and agent handoff.
+- `ui.lua` is the public UI facade; `ui/` contains comment input, the floating
+  comment list, and agent handoff implementations.
 - `herdr.lua` wraps the `herdr` CLI.
 
 `README.md` is the user-facing installation and usage documentation. There
-are currently no checked-in tests, assets, or generated files.
+are no generated files checked in.
 
 ## Build, Test, and Development Commands
 
-There is no build system, package manifest, or automated test command. Install
-the plugin locally through your Neovim plugin manager, then manually smoke-test
-changes in a Neovim session with Diffview, plenary.nvim, and a running `herdr`
-server:
+The repository uses Make, Plenary, StyLua, and Luacheck. Install the test
+dependency into the checkout and run the checks from a clean checkout:
+
+```sh
+git clone --depth 1 https://github.com/nvim-lua/plenary.nvim.git deps/plenary.nvim
+make check PLENARY_PATH=deps/plenary.nvim
+```
+
+Individual commands are `make test`, `make lint`, `make format`, and
+`make format-check`. Install the plugin locally through your Neovim plugin
+manager, then manually smoke-test changes in a Neovim session with Diffview,
+plenary.nvim, and a running `herdr` server:
 
 ```vim
 :DiffviewOpen
@@ -30,9 +40,8 @@ server:
 <leader>rs
 ```
 
-Check the working tree with `git status --short` before committing. If adding
-tooling, document the command here and keep it reproducible from a clean
-checkout.
+Check the working tree with `git status --short` before committing. CI runs
+tests on Neovim 0.10 and the latest stable release.
 
 ## Coding Style & Naming Conventions
 
@@ -45,11 +54,12 @@ introducing global state outside the established config/session tables.
 
 ## Testing Guidelines
 
-No automated coverage requirement currently exists. For changes, exercise the
-affected workflow manually in Diffview, including both old and new diff sides,
-comment creation/edit/delete, session reloads, and agent submission when
-relevant. Verify persisted JSON under Neovim's data directory when changing
-storage behavior.
+Tests use Plenary and focus on storage, comment rules, path handling, prompt
+generation, Diffview adaptation, and session extmarks. For changes, also
+exercise the affected workflow manually in Diffview, including both old and
+new diff sides, comment creation/edit/delete, session reloads, and agent
+submission when relevant. Verify persisted JSON under Neovim's data directory
+when changing storage behavior.
 
 ## Commit & Pull Request Guidelines
 

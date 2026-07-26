@@ -29,35 +29,8 @@ function M.setup(opts)
     group = group,
     callback = function(args)
       local bufnr = args.buf
-      local ok, view = pcall(function()
-        return require("diffview.lib").get_current_view()
-      end)
-
-      if not ok or not view or not view.cur_layout then
-        return
-      end
-
-      local cur_win = vim.api.nvim_get_current_win()
-      local layout = view.cur_layout
-
-      local side = nil
-      local file = nil
-
-      if layout.a and layout.a.id == cur_win then
-        side = "old"
-        file = layout.a.file
-      elseif layout.b and layout.b.id == cur_win then
-        side = "new"
-        file = layout.b.file
-      end
-
-      if side and file then
-        local file_path = type(file) == "string" and file or file.path
-        diff.set_buf_side(bufnr, side, file, file_path)
-        session.on_buf_enter(bufnr, file_path)
-      else
-        session.on_buf_enter(bufnr)
-      end
+      local context = diff.capture_buffer_context(bufnr)
+      session.on_buf_enter(bufnr, context and context.path or nil)
     end,
   })
 

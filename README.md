@@ -14,6 +14,7 @@ Leave comments on diff lines, review them in a floating window, and send to a he
 
 ## Requirements
 
+- Neovim 0.10+
 - [Diffview.nvim](https://github.com/sindrets/diffview.nvim)
 - [herdr](https://github.com/herdr/herdr) CLI installed and running
 - [plenary.nvim](https://github.com/nvim-lua/plenary.nvim)
@@ -73,9 +74,29 @@ require("herdr-review").setup({
 
 ## How it works
 
-- Comments are stored in `~/.local/share/nvim/herdr-review/<commit-range>.json`
-- Each comment is tied to a file, side (old/new), and line number
+- Comments are stored in `~/.local/share/nvim/herdr-review/sessions/<sha256-range>.json`
+- Session files use storage schema version 2
+- Each comment is tied to one side-specific file path, side (`old`/`new`), and line number
 - On `<leader>rs`, a structured prompt is sent to the selected herdr agent
+
+## Development
+
+Install the test dependency into the checkout, then run the checks:
+
+```sh
+git clone --depth 1 https://github.com/nvim-lua/plenary.nvim.git deps/plenary.nvim
+make check PLENARY_PATH=deps/plenary.nvim
+```
+
+Available commands:
+
+| Command | Action |
+|---------|--------|
+| `make test` | Run headless Plenary tests |
+| `make lint` | Run Luacheck |
+| `make format` | Format Lua files with StyLua |
+| `make format-check` | Check StyLua formatting |
+| `make check` | Run formatting, lint, and tests |
 
 ## License
 
