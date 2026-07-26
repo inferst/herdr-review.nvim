@@ -1,10 +1,12 @@
 local model = require("review-diff.model")
 local render = require("review-diff.render")
+local syntax = require("review-diff.syntax")
 
 local M = {}
 
 local render_ns = vim.api.nvim_create_namespace("review-diff-render")
 local annotation_ns = vim.api.nvim_create_namespace("review-diff-annotations")
+local syntax_ns = vim.api.nvim_create_namespace("review-diff-syntax")
 local active_view
 local view_counter = 0
 
@@ -13,6 +15,10 @@ local DEFAULT_OPTIONS = {
   ignore_whitespace = false,
   algorithm = "histogram",
   intra_line = false,
+  syntax = {
+    enabled = true,
+    engine = "treesitter",
+  },
 }
 
 local DEFAULT_KEYMAPS = {
@@ -190,6 +196,61 @@ function View:get_display_rows()
   return self.display_rows
 end
 
+local function syntax_value(file, side)
+  if side == "old" then
+    return file.old_path, file.old_text
+  end
+  return file.new_path, file.new_text
+end
+
+function View:apply_syntax()
+  for _, side in ipairs({ "old", "new" }) do
+    vim.api.nvim_buf_clear_namespace(self[side .. "_buf"], syntax_ns, 0, -1)
+  end
+
+  local syntax_options = self.options.syntax
+  if syntax_options == false or (type(syntax_options) == "table" and syntax_options.enabled == false) then
+    return
+  end
+
+  for _, side in ipairs({ "old", "new" }) do
+    local bufnr = self[side .. "_buf"]
+    for _, file in ipairs(self.files) do
+      local path, text = syntax_value(file, side)
+      if path and text and not file.binary and not file.too_large then
+        self.syntax_cache[file.id] = self.syntax_cache[file.id] or {}
+        local cached = self.syntax_cache[file.id][side]
+        if not cached or cached.path ~= path or cached.text ~= text then
+          cached = {
+            path = path,
+            text = text,
+            spans = syntax.collect(path, text, syntax_options),
+          }
+          self.syntax_cache[file.id][side] = cached
+        end
+
+        for _, span in ipairs(cached.spans) do
+          local row_index, row = self:location_row({ file = path, side = side, line = span.line })
+          if row_index then
+            local prefix_width = render.source_prefix_width(row, side)
+            local start_col = prefix_width + span.start_col
+            local end_col = prefix_width + span.end_col
+            if end_col > start_col then
+              vim.api.nvim_buf_set_extmark(bufnr, syntax_ns, row_index - 1, start_col, {
+                end_row = row_index - 1,
+                end_col = end_col,
+                hl_group = span.hl_group,
+                hl_mode = "combine",
+                priority = span.priority,
+              })
+            end
+          end
+        end
+      end
+    end
+  end
+end
+
 function View:render()
   self.display_rows = render.display_rows(self.files, self.state)
   self.rendering = true
@@ -216,6 +277,7 @@ function View:render()
     end
   end
   self.rendering = false
+  self:apply_syntax()
   self:apply_annotations()
   self:emit("rendered")
 end
@@ -683,6 +745,7 @@ function View:replace(input)
   local previous_collapsed = self.state.collapsed_files
   self.input = vim.deepcopy(input)
   self.files = model.build(input.files or {}, self.options).files
+  self.syntax_cache = {}
   self.state.context_lines = self.options.context_lines
   self.state.empty_text = input.empty_text or "No changes"
   self.state.collapsed_files = {}
@@ -854,6 +917,7 @@ function M.open(input, opts)
     listeners = {},
     annotations = {},
     annotation_order = {},
+    syntax_cache = {},
     keymaps = {},
     win_sides = {},
     state = {

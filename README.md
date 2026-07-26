@@ -11,6 +11,7 @@ The plugin opens a dedicated review tab with two read-only columns: the old file
 - Show modified, added, deleted, renamed, binary, and oversized files
 - Group changes by file and collapse groups with `<Tab>`
 - Align old/new lines with git-like line-level highlighting by default, with optional intra-line highlighting
+- Highlight source text with Tree-sitter when a language parser is available
 - Leave comments on any real old/new source line
 - Persist comments by repository and resolved Git object IDs
 - Re-anchor comments from their saved context when lines move
@@ -22,6 +23,9 @@ The plugin opens a dedicated review tab with two read-only columns: the old file
 - Git
 - [herdr](https://github.com/herdr/herdr) CLI installed and running for agent handoff
 - [plenary.nvim](https://github.com/nvim-lua/plenary.nvim)
+
+Tree-sitter parsers are optional. If a parser is unavailable for a file, the
+review remains usable without syntax highlighting.
 
 ## Installation
 
@@ -87,6 +91,10 @@ require("herdr-review").setup({
     context_lines = 3,
     ignore_whitespace = false,
     intra_line = false,
+    syntax = {
+      enabled = true,
+      engine = "treesitter",
+    },
     max_file_bytes = 2 * 1024 * 1024,
     max_file_lines = 100000,
   },

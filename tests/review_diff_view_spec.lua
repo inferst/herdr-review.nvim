@@ -35,6 +35,32 @@ describe("review diff view", function()
     assert.are.equal("    2 │ three", vim.api.nvim_buf_get_lines(view.new_buf, 2, 3, false)[1])
   end)
 
+  it("projects Tree-sitter highlights into the aggregate buffers", function()
+    local parser_available = pcall(vim.treesitter.get_parser, 0, "lua")
+    local syntax_ns = vim.api.nvim_create_namespace("review-diff-syntax")
+    view = viewer.open({
+      repo_root = vim.fn.getcwd(),
+      review_id = "review-syntax",
+      spec = { old = { kind = "ref", name = "HEAD" }, new = { kind = "worktree" } },
+      files = {
+        {
+          old_path = "lua/example.lua",
+          new_path = "lua/example.lua",
+          old_text = "local value = 1",
+          new_text = "local value = 2",
+          status = "modified",
+        },
+      },
+    })
+
+    local marks = vim.api.nvim_buf_get_extmarks(view.new_buf, syntax_ns, 0, -1, {})
+    if parser_available then
+      assert.is_true(#marks > 0)
+    else
+      assert.are.equal(0, #marks)
+    end
+  end)
+
   it("keeps the old side empty for an added file", function()
     view = viewer.open({
       repo_root = vim.fn.getcwd(),

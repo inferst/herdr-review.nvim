@@ -22,6 +22,21 @@ local function path_label(file, side)
   return side_path(file, side) or "—"
 end
 
+local function source_line(row, side)
+  if side == "old" then
+    return row.source_row.old_line
+  end
+  return row.source_row.new_line
+end
+
+---@param row table
+---@param side "old"|"new"
+---@return integer
+function M.source_prefix_width(row, side)
+  local line = source_line(row, side)
+  return line and #string.format("%5d │ ", line) or #"      │ "
+end
+
 local function fold_key(file, row)
   return string.format("%s:%d:%d", file.id, row.first_row, row.last_row)
 end
@@ -168,13 +183,7 @@ function M.highlight(row, side, opts)
     return line_hl, nil
   end
 
-  local line
-  if side == "old" then
-    line = source_row.old_line
-  else
-    line = source_row.new_line
-  end
-  local prefix_width = line and #string.format("%5d │ ", line) or #"      │ "
+  local prefix_width = M.source_prefix_width(row, side)
   if side == "old" then
     return line_hl, { start = prefix_width + range.old_start, finish = prefix_width + range.old_end }
   end
