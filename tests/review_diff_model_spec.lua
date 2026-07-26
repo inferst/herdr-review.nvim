@@ -82,8 +82,27 @@ describe("review diff model", function()
         old_text = "old",
         new_text = "new",
       },
-    }, "new")
+    }, "new", { intra_line = true })
 
     assert.are.equal(#string.format("%5d │ ", 100000), inline.start)
+  end)
+
+  it("uses line-level highlighting unless intra-line mode is enabled", function()
+    local row = {
+      display_kind = "line",
+      source_row = {
+        kind = "change",
+        old_line = 1,
+        new_line = 1,
+        old_text = "old",
+        new_text = "new",
+      },
+    }
+
+    local _, default_inline = render.highlight(row, "new")
+    local _, detailed_inline = render.highlight(row, "new", { intra_line = true })
+
+    assert.is_nil(default_inline)
+    assert.is_truthy(detailed_inline)
   end)
 end)

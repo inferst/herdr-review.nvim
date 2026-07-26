@@ -10,7 +10,7 @@ The plugin opens a dedicated review tab with two read-only columns: the old file
 - Include staged, unstaged, and untracked files in worktree reviews
 - Show modified, added, deleted, renamed, binary, and oversized files
 - Group changes by file and collapse groups with `<Tab>`
-- Align old/new lines with line-level and intra-line diff highlighting
+- Align old/new lines with git-like line-level highlighting by default, with optional intra-line highlighting
 - Leave comments on any real old/new source line
 - Persist comments by repository and resolved Git object IDs
 - Re-anchor comments from their saved context when lines move
@@ -86,6 +86,7 @@ require("herdr-review").setup({
   diff = {
     context_lines = 3,
     ignore_whitespace = false,
+    intra_line = false,
     max_file_bytes = 2 * 1024 * 1024,
     max_file_lines = 100000,
   },

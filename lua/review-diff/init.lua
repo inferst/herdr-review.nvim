@@ -12,6 +12,7 @@ local DEFAULT_OPTIONS = {
   context_lines = 3,
   ignore_whitespace = false,
   algorithm = "histogram",
+  intra_line = false,
 }
 
 local DEFAULT_KEYMAPS = {
@@ -205,7 +206,7 @@ function View:render()
     vim.api.nvim_buf_clear_namespace(bufnr, render_ns, 0, -1)
 
     for index, row in ipairs(self.display_rows) do
-      local line_hl, inline = render.highlight(row, side)
+      local line_hl, inline = render.highlight(row, side, self.options)
       if line_hl then
         vim.api.nvim_buf_add_highlight(bufnr, render_ns, line_hl, index - 1, 0, -1)
       end

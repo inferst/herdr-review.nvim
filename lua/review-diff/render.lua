@@ -121,8 +121,9 @@ end
 
 ---@param row table
 ---@param side "old"|"new"
+---@param opts table|nil
 ---@return string|nil, table|nil
-function M.highlight(row, side)
+function M.highlight(row, side, opts)
   if row.display_kind == "file_header" then
     return "ReviewDiffFileHeader", nil
   end
@@ -153,6 +154,10 @@ function M.highlight(row, side)
   end
 
   if source_row.kind ~= "change" or not line_text then
+    return line_hl, nil
+  end
+
+  if not (opts and opts.intra_line) then
     return line_hl, nil
   end
 

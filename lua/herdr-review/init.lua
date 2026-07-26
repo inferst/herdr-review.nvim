@@ -151,6 +151,7 @@ function M.setup(opts)
     context_lines = 3,
     ignore_whitespace = false,
     algorithm = "histogram",
+    intra_line = false,
     max_file_bytes = 2 * 1024 * 1024,
     max_file_lines = 100000,
   }, opts.diff or {})
