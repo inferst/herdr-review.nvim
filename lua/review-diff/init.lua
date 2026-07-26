@@ -257,9 +257,10 @@ function View:render()
   self.rendering = true
   for _, side in ipairs({ "old", "new" }) do
     local bufnr = self[side .. "_buf"]
+    local width = vim.api.nvim_win_get_width(self[side .. "_win"])
     local lines = {}
     for _, row in ipairs(self.display_rows) do
-      table.insert(lines, render.text(row, side))
+      table.insert(lines, render.text(row, side, width))
     end
 
     vim.bo[bufnr].modifiable = true
@@ -274,8 +275,16 @@ function View:render()
           line_hl_group = line_hl,
         })
       end
-      if inline then
-        vim.api.nvim_buf_add_highlight(bufnr, render_ns, "ReviewDiffText", index - 1, inline.start, inline.finish)
+      if inline and inline.finish > inline.start then
+        local inline_text = string.sub(lines[index], inline.start + 1, inline.finish)
+        vim.api.nvim_buf_set_extmark(bufnr, render_ns, index - 1, inline.start, {
+          end_row = index - 1,
+          end_col = inline.finish,
+          hl_group = "ReviewDiffText",
+          virt_text = { { inline_text, "ReviewDiffText" } },
+          virt_text_pos = "overlay",
+          priority = 20000,
+        })
       end
     end
   end
@@ -896,6 +905,14 @@ local function setup_autocmds(view)
       end,
     })
   end
+  vim.api.nvim_create_autocmd("WinResized", {
+    group = group,
+    callback = function()
+      if not view.closed and not view.rendering and vim.api.nvim_get_current_tabpage() == view.tabpage then
+        view:render()
+      end
+    end,
+  })
 end
 
 local function open_tab(view)

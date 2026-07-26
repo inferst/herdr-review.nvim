@@ -103,8 +103,9 @@ end
 
 ---@param row table
 ---@param side "old"|"new"
+---@param width integer|nil
 ---@return string
-function M.text(row, side)
+function M.text(row, side, width)
   if row.display_kind == "empty" then
     return "  " .. row.text
   end
@@ -131,6 +132,10 @@ function M.text(row, side)
     text = source_row.new_text
   end
   local prefix = line and string.format("%5d │ ", line) or "      │ "
+  if not line and width then
+    local remaining = math.max(0, width - vim.fn.strdisplaywidth(prefix))
+    return prefix .. string.rep(" ", remaining)
+  end
   return prefix .. (text or "")
 end
 
@@ -160,12 +165,12 @@ function M.highlight(row, side, opts)
     line_text = source_row.new_text
   end
   local line_hl
-  if source_row.kind == "add" and side == "new" then
-    line_hl = "ReviewDiffAdd"
-  elseif source_row.kind == "delete" and side == "old" then
-    line_hl = "ReviewDiffDelete"
+  if source_row.kind == "add" then
+    line_hl = side == "new" and "ReviewDiffAdd" or "ReviewDiffChange"
+  elseif source_row.kind == "delete" then
+    line_hl = side == "old" and "ReviewDiffDelete" or "ReviewDiffChange"
   elseif source_row.kind == "change" then
-    line_hl = "ReviewDiffChange"
+    line_hl = side == "old" and "ReviewDiffDelete" or "ReviewDiffAdd"
   end
 
   if source_row.kind ~= "change" or not line_text then

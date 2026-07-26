@@ -99,10 +99,14 @@ describe("review diff model", function()
       },
     }
 
-    local _, default_inline = render.highlight(row, "new")
+    local default_hl, default_inline = render.highlight(row, "new")
     local _, detailed_inline = render.highlight(row, "new", { intra_line = true })
 
+    assert.are.equal("ReviewDiffAdd", default_hl)
     assert.is_nil(default_inline)
     assert.is_truthy(detailed_inline)
+
+    local old_hl = render.highlight(row, "old")
+    assert.are.equal("ReviewDiffDelete", old_hl)
   end)
 end)

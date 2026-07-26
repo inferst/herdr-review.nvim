@@ -51,22 +51,80 @@ describe("review diff view", function()
           status = "modified",
         },
       },
-    })
+    }, { intra_line = true, syntax = false })
 
-    local marks = vim.api.nvim_buf_get_extmarks(view.new_buf, render_ns, 0, -1, { details = true })
-    local changed_line_details
-    for _, mark in ipairs(marks) do
-      if mark[2] == 2 then
-        changed_line_details = mark[4]
+    local new_marks = vim.api.nvim_buf_get_extmarks(view.new_buf, render_ns, 0, -1, { details = true })
+    local new_changed_line_details
+    local new_inline_details
+    for _, mark in ipairs(new_marks) do
+      if mark[2] == 2 and mark[4].line_hl_group == "ReviewDiffAdd" then
+        new_changed_line_details = mark[4]
+      elseif mark[2] == 2 and mark[4].hl_group == "ReviewDiffText" then
+        new_inline_details = mark[4]
+      end
+    end
+
+    assert.is_truthy(new_changed_line_details)
+    assert.are.same("ReviewDiffAdd", new_changed_line_details.line_hl_group)
+    assert.is_truthy(new_inline_details)
+    assert.is_truthy(new_inline_details.virt_text)
+    assert.is_true(new_changed_line_details.priority < new_inline_details.priority)
+
+    local old_marks = vim.api.nvim_buf_get_extmarks(view.old_buf, render_ns, 0, -1, { details = true })
+    local old_changed_line_details
+    for _, mark in ipairs(old_marks) do
+      if mark[2] == 2 and mark[4].line_hl_group == "ReviewDiffDelete" then
+        old_changed_line_details = mark[4]
         break
       end
     end
 
-    assert.are.same("ReviewDiffChange", changed_line_details.line_hl_group)
+    assert.is_truthy(old_changed_line_details)
+    assert.are.same("ReviewDiffDelete", old_changed_line_details.line_hl_group)
 
     local cursorline_marks = vim.api.nvim_buf_get_extmarks(view.new_buf, cursorline_ns, 0, -1, { details = true })
     assert.are.same(1, #cursorline_marks)
     assert.are.same("CursorLine", cursorline_marks[1][4].line_hl_group)
+  end)
+
+  it("keeps intra-line highlights visible over cursorline", function()
+    local render_ns = vim.api.nvim_create_namespace("review-diff-render")
+    local cursorline_ns = vim.api.nvim_create_namespace("review-diff-cursorline")
+    view = viewer.open(
+      {
+        repo_root = vim.fn.getcwd(),
+        review_id = "review-intra-line-highlight",
+        spec = { old = { kind = "ref", name = "HEAD" }, new = { kind = "worktree" } },
+        files = {
+          {
+            old_path = "lua/example.lua",
+            new_path = "lua/example.lua",
+            old_text = "one\ntwo",
+            new_text = "one\nthree",
+            status = "modified",
+          },
+        },
+      },
+      { intra_line = true, syntax = false }
+    )
+
+    local marks = vim.api.nvim_buf_get_extmarks(view.new_buf, render_ns, 0, -1, { details = true })
+    local inline_details
+    for _, mark in ipairs(marks) do
+      if mark[2] == 2 and mark[4].hl_group == "ReviewDiffText" then
+        inline_details = mark[4]
+        break
+      end
+    end
+
+    assert.is_truthy(inline_details)
+    assert.is_truthy(inline_details.virt_text)
+    assert.is_true(inline_details.priority > 10000)
+
+    local cursorline_marks = vim.api.nvim_buf_get_extmarks(view.new_buf, cursorline_ns, 0, -1, { details = true })
+    assert.are.same(1, #cursorline_marks)
+    assert.are.same("CursorLine", cursorline_marks[1][4].line_hl_group)
+    assert.is_true(cursorline_marks[1][4].priority < inline_details.priority)
   end)
 
   it("projects Tree-sitter highlights into the aggregate buffers", function()
@@ -96,6 +154,7 @@ describe("review diff view", function()
   end)
 
   it("keeps the old side empty for an added file", function()
+    local render_ns = vim.api.nvim_create_namespace("review-diff-render")
     view = viewer.open({
       repo_root = vim.fn.getcwd(),
       review_id = "review-added",
@@ -113,7 +172,23 @@ describe("review diff view", function()
 
     assert.are.equal("▼ A —", vim.api.nvim_buf_get_lines(view.old_buf, 0, 1, false)[1])
     assert.are.equal("▼ A lua/added.lua", vim.api.nvim_buf_get_lines(view.new_buf, 0, 1, false)[1])
-    assert.are.equal("      │ ", vim.api.nvim_buf_get_lines(view.old_buf, 1, 2, false)[1])
+    local placeholder = vim.api.nvim_buf_get_lines(view.old_buf, 1, 2, false)[1]
+    local placeholder_prefix = "      │ "
+    local width = vim.api.nvim_win_get_width(view.old_win)
+    local remaining = width - vim.fn.strdisplaywidth(placeholder_prefix)
+    assert.are.equal(placeholder_prefix .. string.rep(" ", remaining), placeholder)
+    assert.are.equal(width, vim.fn.strdisplaywidth(placeholder))
+
+    local marks = vim.api.nvim_buf_get_extmarks(view.old_buf, render_ns, 0, -1, { details = true })
+    local placeholder_details
+    for _, mark in ipairs(marks) do
+      if mark[2] == 1 then
+        placeholder_details = mark[4]
+        break
+      end
+    end
+    assert.are.same("ReviewDiffChange", placeholder_details.line_hl_group)
+
     assert.are.equal("    1 │ one", vim.api.nvim_buf_get_lines(view.new_buf, 1, 2, false)[1])
     assert.is_nil(view:resolve_location({ file = "lua/added.lua", side = "old", line = 1 }))
   end)
