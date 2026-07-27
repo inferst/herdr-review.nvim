@@ -68,19 +68,19 @@ local function attach_view(view)
   end)
 
   view:map({
-    key = "<leader>" .. config.keymaps.create_comment,
+    key = config.keymaps.create_comment,
     action = "Add comment",
     desc = "Herdr Review: Add comment",
     callback = ui.create_comment,
   })
   view:map({
-    key = "<leader>" .. config.keymaps.open_list,
+    key = config.keymaps.open_list,
     action = "Open comment list",
     desc = "Herdr Review: Open comment list",
     callback = ui.open_list,
   })
   view:map({
-    key = "<leader>" .. config.keymaps.send_to_agent,
+    key = config.keymaps.send_to_agent,
     action = "Send to agent",
     desc = "Herdr Review: Send to agent",
     callback = ui.send_to_agent,
