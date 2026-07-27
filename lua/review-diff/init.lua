@@ -282,19 +282,19 @@ function View:render()
           col_start = render.source_prefix_width(row, side, self.options)
         end
         vim.api.nvim_buf_set_extmark(bufnr, render_ns, index - 1, col_start, {
-          line_hl_group = line_hl,
+          end_row = index,
+          end_col = 0,
+          hl_group = line_hl,
+          hl_eol = true,
           priority = 50,
         })
       end
       if inline and inline.finish > inline.start then
-        local inline_text = string.sub(lines[index], inline.start + 1, inline.finish)
         vim.api.nvim_buf_set_extmark(bufnr, render_ns, index - 1, inline.start, {
           end_row = index - 1,
           end_col = inline.finish,
           hl_group = "ReviewDiffText",
-          virt_text = { { inline_text, "ReviewDiffText" } },
-          virt_text_pos = "overlay",
-          priority = 20000,
+          priority = 80,
         })
       end
     end
