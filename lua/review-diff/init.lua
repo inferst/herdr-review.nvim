@@ -74,7 +74,6 @@ local function set_default_highlights(opts)
     vim.api.nvim_set_hl(0, "ReviewDiffAdd",        { link = "DiffAdd", default = true })
     vim.api.nvim_set_hl(0, "ReviewDiffDelete",     { link = "DiffDelete", default = true })
     vim.api.nvim_set_hl(0, "ReviewDiffChange",     { link = "DiffChange", default = true })
-    vim.api.nvim_set_hl(0, "ReviewDiffText",       { link = "DiffText", default = true })
     vim.api.nvim_set_hl(0, "ReviewDiffAddIntra",   { link = "DiffText", default = true })
     vim.api.nvim_set_hl(0, "ReviewDiffDeleteIntra",{ link = "DiffText", default = true })
   end
