@@ -1,36 +1,216 @@
 local config = require("herdr-review.config")
 local diff = require("herdr-review.diff")
 local storage = require("herdr-review.storage")
+local viewer = require("review-diff")
 
 local M = {}
 
----@type string|nil
-M.current_range = nil
+local state = {
+  current_range = nil,
+  current_view = nil,
+  stale_ids = {},
+  resolved_locations = {},
+}
 
-local function path_strip_prefix(p)
-  if p:sub(1, 2) == "./" then return p:sub(3) end
-  return p
+local previous_view_state = nil
+
+local function report_storage_error(message)
+  vim.notify(message, vim.log.levels.ERROR)
 end
 
-local function apply_comments(bufnr, comments, file)
-  M.clear_extmarks(bufnr)
-  file = file or diff.get_buf_path(bufnr) or M.get_buf_file(bufnr)
-  if not file then return end
-  file = path_strip_prefix(file)
-  for _, c in ipairs(comments) do
-    if path_strip_prefix(c.file) == file then
-      local line = c.side == "new" and c.line_new or c.line_old
-      if line then
-        M.place_extmark(bufnr, line, c.text)
+---@param view table
+---@return integer
+local function context_radius(view)
+  return view.get_context_radius and view:get_context_radius() or 3
+end
+
+local function normalize_path(path)
+  if not path then
+    return nil
+  end
+  while path:sub(1, 2) == "./" do
+    path = path:sub(3)
+  end
+  return path:gsub("\\", "/")
+end
+
+local function file_for_path(files, path, side)
+  if not path or not side then
+    return nil
+  end
+  path = normalize_path(path)
+  local key = side == "old" and "old_path" or "new_path"
+  for _, file in ipairs(files) do
+    local fp = file[key]
+    if fp and normalize_path(fp) == path then
+      return file
+    end
+  end
+end
+
+function M.capture_view_state(view)
+  if not view then
+    return
+  end
+  local range = view:get_review_id()
+  if not range then
+    return
+  end
+
+  local collapsed_files = {}
+  for id, collapsed in pairs(view.state.collapsed_files) do
+    collapsed_files[id] = collapsed
+  end
+
+  local cursor = nil
+  local current_win = vim.api.nvim_get_current_win()
+  local side = view.win_sides[current_win]
+  if side then
+    local loc = view:get_cursor_location()
+    if loc then
+      cursor = loc
+    else
+      local cursor_pos = vim.api.nvim_win_get_cursor(current_win)
+      local row_idx = math.min(cursor_pos[1], #view.display_rows)
+      local row_data = row_idx > 0 and view.display_rows[row_idx] or nil
+      if row_data and row_data.file then
+        local path = row_data.file.new_path or row_data.file.old_path
+        if path then
+          if row_data.display_kind == "fold" then
+            cursor = { file = path, side = side, line = row_data.fold.first_row }
+          else
+            cursor = { file = path, side = side }
+          end
+        end
       end
     end
   end
+
+  previous_view_state = {
+    range = range,
+    collapsed_files = collapsed_files,
+    cursor = cursor,
+  }
+end
+
+local function restore_view_state(view, saved_state)
+  if not saved_state or not view then
+    return
+  end
+
+  for id, collapsed in pairs(saved_state.collapsed_files) do
+    if view.state.collapsed_files[id] ~= nil then
+      view.state.collapsed_files[id] = collapsed
+    end
+  end
+
+  local cursor_file = nil
+  if saved_state.cursor then
+    cursor_file = file_for_path(view.files, saved_state.cursor.file, saved_state.cursor.side or "new")
+    if cursor_file and saved_state.cursor.line then
+      view.state.collapsed_files[cursor_file.id] = false
+    end
+  end
+
+  view:render()
+
+  if saved_state.cursor and cursor_file then
+    local row_index = nil
+
+    for idx, row in ipairs(view.display_rows) do
+      if row.file_id == cursor_file.id then
+        if saved_state.cursor.line then
+          if row.display_kind == "fold" then
+            local f, l = row.fold.first_row, row.fold.last_row
+            if saved_state.cursor.line >= f and saved_state.cursor.line <= l then
+              row_index = idx
+              break
+            end
+          elseif row.display_kind == "line" then
+            local side_line = row.source_row[saved_state.cursor.side .. "_line"]
+            if side_line == saved_state.cursor.line then
+              row_index = idx
+              break
+            end
+          end
+        elseif row.display_kind == "file_header" then
+          row_index = idx
+          break
+        end
+      end
+    end
+
+    if row_index then
+      view:set_cursor_row(row_index)
+    elseif saved_state.cursor.file then
+      view:open_location({
+        file = saved_state.cursor.file,
+        side = saved_state.cursor.side or "new",
+        line = saved_state.cursor.line or 1,
+      })
+    end
+  end
+end
+
+---@param view table
+---@param comments ReviewComment[]
+---@param range string
+local function apply_comments(view, comments, range)
+  state.resolved_locations = {}
+  local locations = {}
+  local radius = context_radius(view)
+  for _, comment in ipairs(comments) do
+    local location =
+      view:resolve_location({ file = comment.file, side = comment.side, line = comment.line }, comment.context, radius)
+    locations[comment.id] = location
+    if location then
+      state.resolved_locations[comment.id] = location
+      view:expand_location(location)
+      if location.line ~= comment.line then
+        local context = view:get_context(location, radius)
+        storage.update_comment(range, comment.id, {
+          line = location.line,
+          context = context and table.concat(context, "\n") or comment.context,
+          context_start = math.max(1, location.line - radius),
+        })
+      end
+    end
+  end
+  view:render()
+
+  local annotations = {}
+  for _, comment in ipairs(comments) do
+    table.insert(annotations, {
+      id = comment.id,
+      location = locations[comment.id] or { file = comment.file, side = comment.side, line = nil },
+      text = comment.text,
+    })
+  end
+  local result = view:set_annotations(annotations)
+  state.stale_ids = {}
+  for _, id in ipairs(result.stale) do
+    state.stale_ids[id] = true
+  end
+end
+
+---@return string|nil
+function M.get_current_range()
+  return state.current_range
+end
+
+---@return string|nil
+function M.get_commit_range()
+  local view = viewer.current()
+  return view and view:get_review_id() or nil
 end
 
 ---@param bufnr integer
 ---@param line integer
 ---@param text string
 function M.place_extmark(bufnr, line, text)
+  if line < 1 or line > vim.api.nvim_buf_line_count(bufnr) then
+    return
+  end
   vim.api.nvim_buf_set_extmark(bufnr, config.ns, line - 1, 0, {
     virt_text = { { text, "Comment" } },
     virt_text_pos = "eol",
@@ -42,139 +222,93 @@ function M.clear_extmarks(bufnr)
   vim.api.nvim_buf_clear_namespace(bufnr, config.ns, 0, -1)
 end
 
----@return string|nil
-function M.get_commit_range()
-  local view = diff.get_current_view()
+---@param range string
+---@param view table|nil
+---@return boolean
+function M.load_session(range, view)
+  local comments, err = storage.get_comments(range)
+  if not comments then
+    report_storage_error(err)
+    return false
+  end
+
+  state.current_range = range
+  state.current_view = view or viewer.current()
+  if state.current_view then
+    apply_comments(state.current_view, comments, range)
+  end
+  return true
+end
+
+---@param view table|nil
+function M.on_view_opened(view)
+  view = view or viewer.current()
   if not view then
-    return nil
+    return
   end
-
-  if view.rev_arg then
-    return view.rev_arg
+  local range = view:get_review_id()
+  if not range then
+    return
   end
-
-  local left = view.left
-  local right = view.right
-
-  if not left or not right then
-    return nil
+  if state.current_range and range ~= state.current_range then
+    state.current_range = nil
+    state.stale_ids = {}
   end
+  M.load_session(range, view)
 
-  local left_str = ""
-  local right_str = ""
-
-  if left.commit then
-    left_str = string.sub(left.commit, 1, 7)
-  elseif left.type == 1 then
-    left_str = "WORKDIR"
-  elseif left.type == 3 then
-    left_str = "INDEX"
+  local saved = previous_view_state
+  if saved and saved.range == range then
+    previous_view_state = nil
+    restore_view_state(view, saved)
   end
-
-  if right.commit then
-    right_str = string.sub(right.commit, 1, 7)
-  elseif right.type == 1 then
-    right_str = "WORKDIR"
-  elseif right.type == 3 then
-    right_str = "INDEX"
-  end
-
-  if left_str == "" or right_str == "" then
-    return nil
-  end
-
-  return left_str .. ".." .. right_str
 end
 
 ---@param bufnr integer
----@return string|nil
-function M.get_buf_file(bufnr)
-  local name = vim.api.nvim_buf_get_name(bufnr)
-  if name == "" then
-    return nil
-  end
-
-  if name:sub(1, 11) == "diffview://" then
-    local git_pos = name:find("/.git/", 12, true)
-    if git_pos then
-      local rel_start = name:find("/", git_pos + 5, true)
-      if rel_start then
-        return name:sub(rel_start + 1)
-      end
-    end
-  end
-
-  local view = diff.get_current_view()
+---@param _file string|nil
+function M.on_buf_enter(bufnr, _file)
+  local view = viewer.current()
   if not view then
-    return nil
-  end
-
-  local toplevel = ""
-  if view.adapter and view.adapter.ctx then
-    toplevel = view.adapter.ctx.toplevel or ""
-  end
-
-  if toplevel ~= "" and name:sub(1, #toplevel) == toplevel then
-    return name:sub(#toplevel + 2)
-  end
-
-  return name
-end
-
----@param range string
-function M.load_session(range)
-  M.current_range = range
-  local comments = storage.get_comments(range)
-  for _, bufnr in ipairs(vim.api.nvim_list_bufs()) do
-    if vim.api.nvim_buf_is_loaded(bufnr) then
-      apply_comments(bufnr, comments)
-    end
-  end
-end
-
-function M.on_view_opened()
-  local range = M.get_commit_range()
-  if not range then return end
-
-  if M.current_range and range ~= M.current_range then
-    for _, bufnr in ipairs(vim.api.nvim_list_bufs()) do
-      if vim.api.nvim_buf_is_loaded(bufnr) then
-        M.clear_extmarks(bufnr)
-      end
-    end
-  end
-
-  M.load_session(range)
-end
-
-function M.on_buf_enter(bufnr, file)
-  local range = M.get_commit_range()
-
-  if range then
-    if M.current_range ~= range then
-      for _, b in ipairs(vim.api.nvim_list_bufs()) do
-        if vim.api.nvim_buf_is_loaded(b) then
-          M.clear_extmarks(b)
-        end
-      end
-      M.load_session(range)
-    end
-    apply_comments(bufnr, storage.get_comments(range), file)
     return
   end
-
-  if M.current_range then
-    apply_comments(bufnr, storage.get_comments(M.current_range), file)
+  diff.capture_buffer_context(bufnr)
+  local range = view:get_review_id()
+  if range and state.current_range ~= range then
+    M.load_session(range, view)
   end
 end
 
-function M.on_view_closed()
-  M.current_range = nil
+function M.reset()
+  state.current_range = nil
+  state.current_view = nil
+  state.stale_ids = {}
+  state.resolved_locations = {}
   for _, bufnr in ipairs(vim.api.nvim_list_bufs()) do
     if vim.api.nvim_buf_is_loaded(bufnr) then
       M.clear_extmarks(bufnr)
     end
   end
+end
+
+function M.on_view_closed(view)
+  if view then
+    M.capture_view_state(view)
+  end
+  M.reset()
+end
+
+---@param id string
+---@return boolean
+function M.is_stale(id)
+  return state.stale_ids[id] == true
+end
+
+---@param comment ReviewComment
+---@return table|nil
+function M.resolve_comment(comment)
+  if state.stale_ids[comment.id] then
+    return nil
+  end
+  return state.resolved_locations[comment.id] or { file = comment.file, side = comment.side, line = comment.line }
 end
 
 return M
