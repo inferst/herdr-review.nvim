@@ -12,7 +12,7 @@ https://github.com/user-attachments/assets/da92b09d-4720-44bd-bc56-01f9cbd11113
 - Include staged, unstaged, and untracked files in worktree reviews
 - Show modified, added, deleted, renamed, binary, and oversized files
 - Group changes by file and collapse groups with `<Tab>`
-- Align old/new lines with git-like line-level highlighting by default, with optional intra-line highlighting
+- Align old/new lines with git-like line-level highlighting, including intra-line diff highlighting
 - Highlight source text with Tree-sitter when a language parser is available
 - Leave comments on any real old/new source line
 - Persist comments by repository and resolved Git object IDs
@@ -34,7 +34,7 @@ review remains usable without syntax highlighting.
 ```lua
 -- lazy.nvim
 {
-  "inferst/nvim-herdr-review",
+  "inferst/herdr-review.nvim",
   dependencies = {
     "nvim-lua/plenary.nvim",
   },
@@ -79,9 +79,9 @@ Old-side and historical new-side `<CR>` targets are intentionally not opened in 
 
 | Key | Action |
 |-----|--------|
-| `<leader>rc` | Add or edit a comment on the current source line |
-| `<leader>rl` | Open the comment list |
-| `<leader>rs` | Send non-stale comments to a herdr agent |
+| `rc` | Add or edit a comment on the current source line |
+| `rl` | Open the comment list |
+| `rs` | Send non-stale comments to a herdr agent |
 
 Comment-list keybindings remain `<CR>` to jump, `e` to edit, `d` to delete, and `q`/`<Esc>` to close.
 
@@ -92,12 +92,9 @@ require("herdr-review").setup({
   diff = {
     context_lines = 3,
     ignore_whitespace = false,
-    intra_line = false,
+    collapse_on_open = true,
+    intra_line = true,
     line_numbers = true,
-    syntax = {
-      enabled = true,
-      engine = "treesitter",
-    },
     max_file_bytes = 2 * 1024 * 1024,
     max_file_lines = 100000,
   },
