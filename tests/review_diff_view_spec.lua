@@ -59,7 +59,7 @@ describe("review diff view", function()
     for _, mark in ipairs(new_marks) do
       if mark[2] == 2 and mark[4].hl_group == "ReviewDiffAdd" then
         new_changed_line_details = mark[4]
-      elseif mark[2] == 2 and mark[4].hl_group == "ReviewDiffText" then
+      elseif mark[2] == 2 and mark[4].hl_group == "ReviewDiffAddIntra" then
         new_inline_details = mark[4]
       end
     end
@@ -109,7 +109,7 @@ describe("review diff view", function()
     local marks = vim.api.nvim_buf_get_extmarks(view.new_buf, render_ns, 0, -1, { details = true })
     local inline_details
     for _, mark in ipairs(marks) do
-      if mark[2] == 2 and mark[4].hl_group == "ReviewDiffText" then
+      if mark[2] == 2 and mark[4].hl_group == "ReviewDiffAddIntra" then
         inline_details = mark[4]
         break
       end
