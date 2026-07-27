@@ -51,7 +51,9 @@ describe("review session", function()
     assert.are.equal("HEAD..WORKTREE", session.get_current_range())
     local marks = vim.api.nvim_buf_get_extmarks(view.new_buf, view.annotation_ns, 0, -1, { details = true })
     assert.are.equal(1, #marks)
-    assert.are.same({ { "Review this line.", "Comment" } }, marks[1][4].virt_text)
+    local vl = marks[1][4].virt_lines
+    assert.are_not.equal(nil, vl)
+    assert.is_true(#vl >= 3)
   end)
 
   it("does not place direct extmarks outside the buffer", function()

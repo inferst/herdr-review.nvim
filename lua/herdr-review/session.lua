@@ -173,7 +173,6 @@ local function apply_comments(view, comments, range)
       id = comment.id,
       location = locations[comment.id] or { file = comment.file, side = comment.side, line = nil },
       text = comment.text,
-      hl_group = "Comment",
     })
   end
   local result = view:set_annotations(annotations)

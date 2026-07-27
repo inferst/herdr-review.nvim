@@ -70,6 +70,9 @@ local function set_default_highlights()
   vim.api.nvim_set_hl(0, "ReviewDiffFileHeader", { link = "Title", default = true })
   vim.api.nvim_set_hl(0, "ReviewDiffFold", { link = "Comment", default = true })
   vim.api.nvim_set_hl(0, "ReviewDiffMetadata", { link = "WarningMsg", default = true })
+  vim.api.nvim_set_hl(0, "ReviewDiffCommentBorder", { link = "Comment", default = true })
+  vim.api.nvim_set_hl(0, "ReviewDiffCommentText", { link = "Comment", default = true })
+  vim.api.nvim_set_hl(0, "ReviewDiffCommentTitle", { link = "Title", default = true })
 end
 
 local function create_scratch(name)
@@ -334,11 +337,25 @@ function View:apply_annotations()
       local side = annotation.location and annotation.location.side
       if row_index and side and row.source_row and row.source_row[side .. "_line"] then
         local bufnr = self[side .. "_buf"]
+        local win_width = vim.api.nvim_win_get_width(self[side .. "_win"])
+        local lines = render.annotation_lines(annotation.text or "", win_width)
         local mark_id = vim.api.nvim_buf_set_extmark(bufnr, annotation_ns, row_index - 1, 0, {
-          virt_text = { { annotation.text or "", annotation.hl_group or "Comment" } },
-          virt_text_pos = "eol",
+          virt_lines = lines,
+          virt_lines_above = false,
         })
         annotation.mark_id = mark_id
+
+        local other_side = side == "old" and "new" or "old"
+        local other_bufnr = self[other_side .. "_buf"]
+        local empty = {}
+        for _ = 1, #lines do
+          table.insert(empty, { { "" } })
+        end
+        vim.api.nvim_buf_set_extmark(other_bufnr, annotation_ns, row_index - 1, 0, {
+          virt_lines = empty,
+          virt_lines_above = false,
+        })
+
         table.insert(result.applied, id)
       else
         table.insert(result.stale, id)

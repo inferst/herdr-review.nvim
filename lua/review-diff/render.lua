@@ -2,6 +2,72 @@ local model = require("review-diff.model")
 
 local M = {}
 
+local function wrap_text(text, max_width)
+  if max_width < 1 or not text or text == "" then
+    return { "" }
+  end
+  local lines = {}
+  for word in text:gmatch("%S+") do
+    local current = lines[#lines]
+    if not current then
+      if vim.fn.strdisplaywidth(word) > max_width then
+        table.insert(lines, word)
+      else
+        table.insert(lines, word)
+      end
+    else
+      local candidate = current .. " " .. word
+      if vim.fn.strdisplaywidth(candidate) <= max_width then
+        lines[#lines] = candidate
+      else
+        table.insert(lines, word)
+      end
+    end
+  end
+  if #lines == 0 then
+    lines = { "" }
+  end
+  return lines
+end
+
+---@param text string
+---@param win_width integer
+---@return table[]
+function M.annotation_lines(text, win_width)
+  local width = math.max(20, win_width)
+
+  local top = {
+    { "┌─ ", "ReviewDiffCommentBorder" },
+    { "Comment", "ReviewDiffCommentTitle" },
+    { " " .. string.rep("─", math.max(0, width - 12)) .. "┐", "ReviewDiffCommentBorder" },
+  }
+
+  local content_w = width - 4
+  local wrapped = wrap_text(text, content_w)
+  local content = {}
+  for _, line in ipairs(wrapped) do
+    local line_w = vim.fn.strdisplaywidth(line)
+    local pad = math.max(0, content_w - line_w)
+    table.insert(content, {
+      { "│ ", "ReviewDiffCommentBorder" },
+      { line .. string.rep(" ", pad), "ReviewDiffCommentText" },
+      { " │", "ReviewDiffCommentBorder" },
+    })
+  end
+
+  local bottom = {
+    { "└", "ReviewDiffCommentBorder" },
+    { string.rep("─", math.max(0, width - 2)) .. "┘", "ReviewDiffCommentBorder" },
+  }
+
+  local result = { top }
+  for _, c in ipairs(content) do
+    table.insert(result, c)
+  end
+  table.insert(result, bottom)
+  return result
+end
+
 local STATUS_LABELS = {
   added = "A",
   copied = "C",
