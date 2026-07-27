@@ -271,8 +271,15 @@ function View:render()
     for index, row in ipairs(self.display_rows) do
       local line_hl, inline = render.highlight(row, side, self.options)
       if line_hl then
-        vim.api.nvim_buf_set_extmark(bufnr, render_ns, index - 1, 0, {
-          line_hl_group = line_hl,
+        local col_start = 0
+        local col_end = #lines[index]
+        if row.display_kind == "line" then
+          col_start = render.source_prefix_width(row, side)
+        end
+        vim.api.nvim_buf_set_extmark(bufnr, render_ns, index - 1, col_start, {
+          end_col = col_end,
+          hl_group = line_hl,
+          priority = 50
         })
       end
       if inline and inline.finish > inline.start then
@@ -281,9 +288,7 @@ function View:render()
           end_row = index - 1,
           end_col = inline.finish,
           hl_group = "ReviewDiffText",
-          virt_text = { { inline_text, "ReviewDiffText" } },
-          virt_text_pos = "overlay",
-          priority = 20000,
+          priority = 100,
         })
       end
     end
@@ -397,10 +402,12 @@ function View:location_row(location)
   end
   local side_line = location.side .. "_line"
   for index, row in ipairs(self.display_rows) do
-    if row.display_kind == "line"
+    if
+      row.display_kind == "line"
       and row.file_id == file.id
       and location.line
-      and row.source_row[side_line] == location.line then
+      and row.source_row[side_line] == location.line
+    then
       return index, row
     end
   end

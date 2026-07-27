@@ -118,7 +118,7 @@ function M.build_file(file, opts)
   if opts.ignore_whitespace then
     diff_opts.ignore_whitespace = true
   end
-  local hunks = vim.diff(table.concat(old_lines, "\n"), table.concat(new_lines, "\n"), diff_opts)
+  local hunks = vim.text.diff(table.concat(old_lines, "\n"), table.concat(new_lines, "\n"), diff_opts)
   local old_cursor, new_cursor = 1, 1
 
   for _, hunk in ipairs(hunks) do

@@ -151,7 +151,7 @@ function M.setup(opts)
     context_lines = 3,
     ignore_whitespace = false,
     algorithm = "histogram",
-    intra_line = false,
+    intra_line = true,
     syntax = {
       enabled = true,
       engine = "treesitter",
