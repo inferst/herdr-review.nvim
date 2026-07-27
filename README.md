@@ -4,6 +4,8 @@ Code review UI for Neovim with Git and [herdr](https://github.com/herdr/herdr) i
 
 The plugin opens a dedicated review tab with two read-only columns: the old file on the left and the new file on the right. It does not depend on Diffview.nvim.
 
+https://github.com/user-attachments/assets/da92b09d-4720-44bd-bc56-01f9cbd11113
+
 ## Features
 
 - Compare uncommitted changes, branches, commits, remote-tracking branches, or explicit Git ranges
