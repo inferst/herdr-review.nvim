@@ -2,6 +2,15 @@ local spec_module = require("review-diff.spec")
 
 local M = {}
 
+local function hash_parts(parts)
+  local encoded = {}
+  for _, part in ipairs(parts) do
+    part = tostring(part)
+    table.insert(encoded, string.format("%d:%s", #part, part))
+  end
+  return vim.fn.sha256(table.concat(encoded))
+end
+
 local STATUS_MAP = {
   A = "added",
   C = "copied",
@@ -272,7 +281,7 @@ function M.resolve(spec, opts, callbacks)
                 return
               end
               local target_id = spec.new.kind == "worktree" and "WORKTREE" or new_oid
-              local review_id = vim.fn.sha256(table.concat({ root, spec.operator, compare_old_oid, target_id }, "\0"))
+              local review_id = hash_parts({ root, spec.operator, compare_old_oid, target_id })
               if callbacks.on_ready then
                 callbacks.on_ready({
                   cwd = opts.cwd,
