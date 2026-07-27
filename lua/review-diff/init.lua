@@ -16,6 +16,7 @@ local DEFAULT_OPTIONS = {
   ignore_whitespace = false,
   algorithm = "histogram",
   intra_line = false,
+  collapse_on_open = true,
   syntax = {
     enabled = true,
     engine = "treesitter",
@@ -33,6 +34,7 @@ local DEFAULT_KEYMAPS = {
   next_hunk = "]c",
   previous_hunk = "[c",
   toggle_fold = "za",
+  toggle_all = "zA",
   expand_all = "zR",
   collapse_all = "zM",
 }
@@ -623,6 +625,20 @@ function View:collapse_all()
   self:render()
 end
 
+function View:toggle_all()
+  local all_collapsed = true
+  for _, file in ipairs(self.files) do
+    if not self.state.collapsed_files[file.id] then
+      all_collapsed = false
+      break
+    end
+  end
+  for _, file in ipairs(self.files) do
+    self.state.collapsed_files[file.id] = not all_collapsed
+  end
+  self:render()
+end
+
 local function move_to_rows(view, predicate, direction)
   local cursor = vim.api.nvim_win_get_cursor(vim.api.nvim_get_current_win())
   local candidates = {}
@@ -789,7 +805,7 @@ function View:replace(input)
   self.state.empty_text = input.empty_text or "No changes"
   self.state.collapsed_files = {}
   for _, file in ipairs(self.files) do
-    self.state.collapsed_files[file.id] = previous_collapsed[file.id] or false
+    self.state.collapsed_files[file.id] = previous_collapsed[file.id] or self.options.collapse_on_open
   end
   self.state.expanded_folds = {}
   self:render()
@@ -879,6 +895,9 @@ local function setup_keymaps(view)
   mapping("toggle_fold", function()
     view:toggle_fold_at_cursor()
   end, "Toggle context fold")
+  mapping("toggle_all", function()
+    view:toggle_all()
+  end, "Toggle expand/collapse all")
   mapping("expand_all", function()
     view:expand_all()
   end, "Expand all")
@@ -984,7 +1003,7 @@ function M.open(input, opts)
   view.new_buf = create_scratch("review-diff://" .. (input.review_id or view.id) .. "/new")
   view.files = model.build(input.files or {}, opts).files
   for _, file in ipairs(view.files) do
-    view.state.collapsed_files[file.id] = false
+    view.state.collapsed_files[file.id] = opts.collapse_on_open
   end
   active_view = view
   open_tab(view)

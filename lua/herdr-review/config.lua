@@ -12,4 +12,8 @@ M.keymaps = {
   send_to_agent = "rs",
 }
 
+M.diff = {
+  collapse_on_open = true,
+}
+
 return M

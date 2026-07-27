@@ -152,6 +152,7 @@ function M.setup(opts)
     ignore_whitespace = false,
     algorithm = "histogram",
     intra_line = true,
+    collapse_on_open = config.diff.collapse_on_open,
     syntax = {
       enabled = true,
       engine = "treesitter",
