@@ -174,7 +174,7 @@ function M.setup(opts)
   vim.api.nvim_create_user_command("ReviewDiff", function(command)
     start_review(spec_module.parse(command.fargs))
   end, {
-    nargs = "?",
+    nargs = "*",
     complete = git_completion,
     desc = "Open a Git review diff",
   })
