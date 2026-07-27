@@ -274,17 +274,19 @@ function M.highlight(row, side, opts)
 
   local prefix_width = M.source_prefix_width(row, side, opts)
   if side == "old" then
-    return line_hl, {
-      start = prefix_width + range.old_start,
-      finish = prefix_width + range.old_end,
+    return line_hl,
+      {
+        start = prefix_width + range.old_start,
+        finish = prefix_width + range.old_end,
+        hl_group = inline_hl,
+      }
+  end
+  return line_hl,
+    {
+      start = prefix_width + range.new_start,
+      finish = prefix_width + range.new_end,
       hl_group = inline_hl,
     }
-  end
-  return line_hl, {
-    start = prefix_width + range.new_start,
-    finish = prefix_width + range.new_end,
-    hl_group = inline_hl,
-  }
 end
 
 return M
