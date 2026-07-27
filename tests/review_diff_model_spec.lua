@@ -63,6 +63,53 @@ describe("review diff model", function()
     }, file.rows)
   end)
 
+  it("keeps context aligned around middle insertions and deletions", function()
+    local inserted = model.build_file({
+      old_path = "lua/example.lua",
+      new_path = "lua/example.lua",
+      old_text = "one\ntwo\nthree",
+      new_text = "one\ninserted\ntwo\nthree",
+      status = "modified",
+    })
+    local deleted = model.build_file({
+      old_path = "lua/example.lua",
+      new_path = "lua/example.lua",
+      old_text = "one\ntwo\nthree",
+      new_text = "one\nthree",
+      status = "modified",
+    })
+
+    assert.are.same({
+      { kind = "context", old_line = 1, new_line = 1, old_text = "one", new_text = "one" },
+      { kind = "add", old_line = nil, new_line = 2, old_text = nil, new_text = "inserted" },
+      { kind = "context", old_line = 2, new_line = 3, old_text = "two", new_text = "two" },
+      { kind = "context", old_line = 3, new_line = 4, old_text = "three", new_text = "three" },
+    }, inserted.rows)
+    assert.are.same({
+      { kind = "context", old_line = 1, new_line = 1, old_text = "one", new_text = "one" },
+      { kind = "delete", old_line = 2, new_line = nil, old_text = "two", new_text = nil },
+      { kind = "context", old_line = 3, new_line = 2, old_text = "three", new_text = "three" },
+    }, deleted.rows)
+  end)
+
+  it("keeps context aligned across separate insertion and deletion hunks", function()
+    local file = model.build_file({
+      old_path = "lua/example.lua",
+      new_path = "lua/example.lua",
+      old_text = "one\ntwo\nthree\nfour",
+      new_text = "one\nthree\ninserted\nfour",
+      status = "modified",
+    })
+
+    assert.are.same({
+      { kind = "context", old_line = 1, new_line = 1, old_text = "one", new_text = "one" },
+      { kind = "delete", old_line = 2, new_line = nil, old_text = "two", new_text = nil },
+      { kind = "context", old_line = 3, new_line = 2, old_text = "three", new_text = "three" },
+      { kind = "add", old_line = nil, new_line = 3, old_text = nil, new_text = "inserted" },
+      { kind = "context", old_line = 4, new_line = 4, old_text = "four", new_text = "four" },
+    }, file.rows)
+  end)
+
   it("finds changed ranges inside a replaced line", function()
     assert.are.same({
       old_start = 0,

@@ -67,14 +67,18 @@ local function append_context_rows(rows, old_lines, new_lines, old_start, new_st
   return old_start, new_start
 end
 
+local function hunk_line_start(start, count)
+  -- An indices hunk points at the first changed line when count is nonzero.
+  -- With an empty side, start is the number of unchanged lines before the
+  -- change, so the next source line is one position later.
+  return count == 0 and start + 1 or start
+end
+
 local function append_change_rows(rows, old_lines, new_lines, hunk)
-  -- vim.diff uses zero to mean "before the first line".  The cursor
-  -- positions still need to advance from line one so that context between
-  -- an insertion at the start and a later hunk is retained.
-  local old_start = hunk[1] == 0 and 1 or hunk[1]
-  local new_start = hunk[3] == 0 and 1 or hunk[3]
   local old_count = hunk[2]
   local new_count = hunk[4]
+  local old_start = hunk_line_start(hunk[1], old_count)
+  local new_start = hunk_line_start(hunk[3], new_count)
   local count = math.max(old_count, new_count)
 
   for offset = 0, count - 1 do
@@ -122,8 +126,8 @@ function M.build_file(file, opts)
   local old_cursor, new_cursor = 1, 1
 
   for _, hunk in ipairs(hunks) do
-    local old_start = hunk[1] == 0 and #old_lines + 1 or hunk[1]
-    local new_start = hunk[3] == 0 and #new_lines + 1 or hunk[3]
+    local old_start = hunk_line_start(hunk[1], hunk[2])
+    local new_start = hunk_line_start(hunk[3], hunk[4])
     old_cursor, new_cursor = append_context_rows(
       result.rows,
       old_lines,
