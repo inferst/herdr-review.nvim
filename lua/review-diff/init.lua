@@ -582,8 +582,17 @@ function View:toggle_file_at_cursor()
   if not row or not row.file_id then
     return
   end
-  self.state.collapsed_files[row.file_id] = not self.state.collapsed_files[row.file_id]
+  local file_id = row.file_id
+  self.state.collapsed_files[file_id] = not self.state.collapsed_files[file_id]
   self:render()
+  if self.state.collapsed_files[file_id] then
+    for index, display_row in ipairs(self.display_rows) do
+      if display_row.file_id == file_id then
+        self:set_cursor_row(index)
+        break
+      end
+    end
+  end
 end
 
 function View:toggle_fold_at_cursor()
@@ -595,9 +604,24 @@ function View:toggle_fold_at_cursor()
   if row.display_kind == "file_header" then
     self:toggle_file_at_cursor()
   elseif row.display_kind == "fold" then
-    local key = string.format("%s:%d:%d", row.file_id, row.fold.first_row, row.fold.last_row)
-    self.state.expanded_folds[key] = not self.state.expanded_folds[key]
+    local file_id = row.file_id
+    local target_first = row.fold.first_row
+    local target_last = row.fold.last_row
+    local key = string.format("%s:%d:%d", file_id, target_first, target_last)
+    local was_expanded = self.state.expanded_folds[key]
+    self.state.expanded_folds[key] = not was_expanded
     self:render()
+    if was_expanded then
+      for index, display_row in ipairs(self.display_rows) do
+        if display_row.display_kind == "fold"
+          and display_row.file_id == file_id
+          and display_row.fold.first_row == target_first
+          and display_row.fold.last_row == target_last then
+          self:set_cursor_row(index)
+          break
+        end
+      end
+    end
   end
 end
 

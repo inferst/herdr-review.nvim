@@ -12,6 +12,8 @@ local state = {
   resolved_locations = {},
 }
 
+local previous_view_state = nil
+
 local function report_storage_error(message)
   vim.notify(message, vim.log.levels.ERROR)
 end
@@ -20,6 +22,120 @@ end
 ---@return integer
 local function context_radius(view)
   return view.get_context_radius and view:get_context_radius() or 3
+end
+
+local function normalize_path(path)
+  if not path then return nil end
+  while path:sub(1, 2) == "./" do path = path:sub(3) end
+  return path:gsub("\\", "/")
+end
+
+local function file_for_path(files, path, side)
+  if not path or not side then return nil end
+  path = normalize_path(path)
+  local key = side == "old" and "old_path" or "new_path"
+  for _, file in ipairs(files) do
+    local fp = file[key]
+    if fp and normalize_path(fp) == path then return file end
+  end
+end
+
+function M.capture_view_state(view)
+  if not view then return end
+  local range = view:get_review_id()
+  if not range then return end
+
+  local collapsed_files = {}
+  for id, collapsed in pairs(view.state.collapsed_files) do
+    collapsed_files[id] = collapsed
+  end
+
+  local cursor = nil
+  local current_win = vim.api.nvim_get_current_win()
+  local side = view.win_sides[current_win]
+  if side then
+    local loc = view:get_cursor_location()
+    if loc then
+      cursor = loc
+    else
+      local cursor_pos = vim.api.nvim_win_get_cursor(current_win)
+      local row_idx = math.min(cursor_pos[1], #view.display_rows)
+      local row_data = row_idx > 0 and view.display_rows[row_idx] or nil
+      if row_data and row_data.file then
+        local path = row_data.file.new_path or row_data.file.old_path
+        if path then
+          if row_data.display_kind == "fold" then
+            cursor = { file = path, side = side, line = row_data.fold.first_row }
+          else
+            cursor = { file = path, side = side }
+          end
+        end
+      end
+    end
+  end
+
+  previous_view_state = {
+    range = range,
+    collapsed_files = collapsed_files,
+    cursor = cursor,
+  }
+end
+
+local function restore_view_state(view, state)
+  if not state or not view then return end
+
+  for id, collapsed in pairs(state.collapsed_files) do
+    if view.state.collapsed_files[id] ~= nil then
+      view.state.collapsed_files[id] = collapsed
+    end
+  end
+
+  local cursor_file = nil
+  if state.cursor then
+    cursor_file = file_for_path(view.files, state.cursor.file, state.cursor.side or "new")
+    if cursor_file and state.cursor.line then
+      view.state.collapsed_files[cursor_file.id] = false
+    end
+  end
+
+  view:render()
+
+  if state.cursor and cursor_file then
+    local row_index = nil
+
+    for idx, row in ipairs(view.display_rows) do
+      if row.file_id == cursor_file.id then
+        if state.cursor.line then
+          if row.display_kind == "fold" then
+            local f, l = row.fold.first_row, row.fold.last_row
+            if state.cursor.line >= f and state.cursor.line <= l then
+              row_index = idx
+              break
+            end
+          elseif row.display_kind == "line" then
+            local side_line = row.source_row[state.cursor.side .. "_line"]
+            if side_line == state.cursor.line then
+              row_index = idx
+              break
+            end
+          end
+        elseif row.display_kind == "file_header" then
+          row_index = idx
+          break
+        end
+      end
+    end
+
+    if row_index then
+      view:set_cursor_row(row_index)
+    elseif state.cursor.file then
+      view:open_location({
+        file = state.cursor.file,
+        side = state.cursor.side or "new",
+        line = state.cursor.line or 1,
+      })
+    end
+  end
 end
 
 ---@param view table
@@ -129,6 +245,12 @@ function M.on_view_opened(view)
     state.stale_ids = {}
   end
   M.load_session(range, view)
+
+  local saved = previous_view_state
+  if saved and saved.range == range then
+    previous_view_state = nil
+    restore_view_state(view, saved)
+  end
 end
 
 ---@param bufnr integer
@@ -157,7 +279,10 @@ function M.reset()
   end
 end
 
-function M.on_view_closed()
+function M.on_view_closed(view)
+  if view then
+    M.capture_view_state(view)
+  end
   M.reset()
 end
 

@@ -39,10 +39,11 @@ local function attach_view(view)
   view:on("ready", function(current_view)
     session.on_view_opened(current_view)
   end)
-  view:on("closed", function()
-    session.on_view_closed()
+  view:on("closed", function(v)
+    session.on_view_closed(v)
   end)
   view:on("refresh_requested", function(current_view)
+    session.capture_view_state(current_view)
     local current_spec = current_view:get_spec()
     generation = generation + 1
     local refresh_generation = generation
