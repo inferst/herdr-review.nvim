@@ -6,16 +6,10 @@ https://github.com/user-attachments/assets/da92b09d-4720-44bd-bc56-01f9cbd11113
 
 ## Features
 
-- Compare uncommitted changes, branches, commits, remote-tracking branches, or explicit Git ranges
-- Include staged, unstaged, and untracked files in worktree reviews
-- Show modified, added, deleted, renamed, binary, and oversized files
-- Group changes by file and collapse groups with `<Tab>`
-- Align old/new lines with git-like line-level highlighting, including intra-line diff highlighting
-- Highlight source text with Tree-sitter when a language parser is available
-- Leave comments on any real old/new source line
-- Persist comments by repository and resolved Git object IDs
-- Re-anchor comments from their saved context when lines move
-- Review comments in a floating list and send fresh comments to a herdr agent
+- Compare branches, commits, or uncommitted changes
+- Show modified, added, deleted, renamed files with line-level and intra-line diff highlighting
+- Leave, edit, and delete comments
+- Send comments to a herdr agent for review handoff
 
 ## Requirements
 
