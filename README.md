@@ -81,6 +81,7 @@ Comment-list keybindings remain `<CR>` to jump, `e` to edit, `d` to delete, and 
 
 ```lua
 require("herdr-review").setup({
+  highlights = "default",  -- "default" or "theme"; "theme" links to DiffAdd etc.
   diff = {
     context_lines = 3,
     ignore_whitespace = false,
@@ -96,6 +97,25 @@ require("herdr-review").setup({
     send_to_agent = "rs",
   },
 })
+```
+
+### Highlight overrides
+
+When `highlights = "default"` the viewer uses built-in colours.  You can
+override any group with `:highlight` or `vim.api.nvim_set_hl()`:
+
+| Group | Default |
+|-------|---------|
+| `ReviewDiffAdd` | `bg=#2e3a2e` |
+| `ReviewDiffDelete` | `bg=#3a2e2e` |
+| `ReviewDiffChange` | `bg=#2e2e3a` |
+| `ReviewDiffAddIntra` | `bg=#2a6a2a` — changed text inside added lines |
+| `ReviewDiffDeleteIntra` | `bg=#6a2a2a` — changed text inside deleted lines |
+
+Example:
+
+```lua
+vim.api.nvim_set_hl(0, "ReviewDiffAdd", { bg = "#1e3a1e", fg = "#ffffff" })
 ```
 
 ## Viewer interface
