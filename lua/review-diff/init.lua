@@ -16,7 +16,7 @@ local DEFAULT_OPTIONS = {
   ignore_whitespace = false,
   algorithm = "histogram",
   intra_line = false,
-  collapse_on_open = true,
+  collapse_on_open = false,
   line_numbers = true,
   syntax = {
     enabled = true,
@@ -278,14 +278,12 @@ function View:render()
       local line_hl, inline = render.highlight(row, side, self.options)
       if line_hl then
         local col_start = 0
-        local col_end = #lines[index]
         if row.display_kind == "line" then
           col_start = render.source_prefix_width(row, side, self.options)
         end
         vim.api.nvim_buf_set_extmark(bufnr, render_ns, index - 1, col_start, {
-          end_col = col_end,
-          hl_group = line_hl,
-          priority = 50
+          line_hl_group = line_hl,
+          priority = 50,
         })
       end
       if inline and inline.finish > inline.start then
@@ -294,7 +292,9 @@ function View:render()
           end_row = index - 1,
           end_col = inline.finish,
           hl_group = "ReviewDiffText",
-          priority = 100,
+          virt_text = { { inline_text, "ReviewDiffText" } },
+          virt_text_pos = "overlay",
+          priority = 20000,
         })
       end
     end
@@ -631,10 +631,12 @@ function View:toggle_fold_at_cursor()
     self:render()
     if was_expanded then
       for index, display_row in ipairs(self.display_rows) do
-        if display_row.display_kind == "fold"
+        if
+          display_row.display_kind == "fold"
           and display_row.file_id == file_id
           and display_row.fold.first_row == target_first
-          and display_row.fold.last_row == target_last then
+          and display_row.fold.last_row == target_last
+        then
           self:set_cursor_row(index)
           break
         end

@@ -145,7 +145,7 @@ local function resolve_endpoint(job, root, endpoint, callback)
   end)
 end
 
-local function resolve_files(job, root, spec, old_oid, new_oid, compare_old_oid, callback)
+local function resolve_files(job, root, spec, new_oid, compare_old_oid, callback)
   local args = { "diff", "--name-status", "-z", "-M", compare_old_oid }
   if spec.new.kind ~= "worktree" then
     table.insert(args, new_oid)
@@ -257,7 +257,7 @@ function M.resolve(spec, opts, callbacks)
         end
 
         local function finish(compare_old_oid)
-          resolve_files(job, root, spec, old_oid, new_oid, compare_old_oid, function(files, files_error)
+          resolve_files(job, root, spec, new_oid, compare_old_oid, function(files, files_error)
             if files_error then
               if callbacks.on_error then
                 callbacks.on_error(files_error)

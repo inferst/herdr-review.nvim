@@ -90,23 +90,20 @@ describe("review diff view", function()
   it("keeps intra-line highlights visible over cursorline", function()
     local render_ns = vim.api.nvim_create_namespace("review-diff-render")
     local cursorline_ns = vim.api.nvim_create_namespace("review-diff-cursorline")
-    view = viewer.open(
-      {
-        repo_root = vim.fn.getcwd(),
-        review_id = "review-intra-line-highlight",
-        spec = { old = { kind = "ref", name = "HEAD" }, new = { kind = "worktree" } },
-        files = {
-          {
-            old_path = "lua/example.lua",
-            new_path = "lua/example.lua",
-            old_text = "one\ntwo",
-            new_text = "one\nthree",
-            status = "modified",
-          },
+    view = viewer.open({
+      repo_root = vim.fn.getcwd(),
+      review_id = "review-intra-line-highlight",
+      spec = { old = { kind = "ref", name = "HEAD" }, new = { kind = "worktree" } },
+      files = {
+        {
+          old_path = "lua/example.lua",
+          new_path = "lua/example.lua",
+          old_text = "one\ntwo",
+          new_text = "one\nthree",
+          status = "modified",
         },
       },
-      { intra_line = true, syntax = false }
-    )
+    }, { intra_line = true, syntax = false })
 
     local marks = vim.api.nvim_buf_get_extmarks(view.new_buf, render_ns, 0, -1, { details = true })
     local inline_details
@@ -269,10 +266,7 @@ describe("review diff view", function()
 
     assert.are.same(
       { file = "lua/example.lua", side = "new", line = 3 },
-      view:resolve_location(
-        { file = "lua/example.lua", side = "new", line = 2 },
-        "one\ntwo\nchanged"
-      )
+      view:resolve_location({ file = "lua/example.lua", side = "new", line = 2 }, "one\ntwo\nchanged")
     )
   end)
 

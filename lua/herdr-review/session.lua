@@ -25,25 +25,37 @@ local function context_radius(view)
 end
 
 local function normalize_path(path)
-  if not path then return nil end
-  while path:sub(1, 2) == "./" do path = path:sub(3) end
+  if not path then
+    return nil
+  end
+  while path:sub(1, 2) == "./" do
+    path = path:sub(3)
+  end
   return path:gsub("\\", "/")
 end
 
 local function file_for_path(files, path, side)
-  if not path or not side then return nil end
+  if not path or not side then
+    return nil
+  end
   path = normalize_path(path)
   local key = side == "old" and "old_path" or "new_path"
   for _, file in ipairs(files) do
     local fp = file[key]
-    if fp and normalize_path(fp) == path then return file end
+    if fp and normalize_path(fp) == path then
+      return file
+    end
   end
 end
 
 function M.capture_view_state(view)
-  if not view then return end
+  if not view then
+    return
+  end
   local range = view:get_review_id()
-  if not range then return end
+  if not range then
+    return
+  end
 
   local collapsed_files = {}
   for id, collapsed in pairs(view.state.collapsed_files) do
@@ -81,40 +93,42 @@ function M.capture_view_state(view)
   }
 end
 
-local function restore_view_state(view, state)
-  if not state or not view then return end
+local function restore_view_state(view, saved_state)
+  if not saved_state or not view then
+    return
+  end
 
-  for id, collapsed in pairs(state.collapsed_files) do
+  for id, collapsed in pairs(saved_state.collapsed_files) do
     if view.state.collapsed_files[id] ~= nil then
       view.state.collapsed_files[id] = collapsed
     end
   end
 
   local cursor_file = nil
-  if state.cursor then
-    cursor_file = file_for_path(view.files, state.cursor.file, state.cursor.side or "new")
-    if cursor_file and state.cursor.line then
+  if saved_state.cursor then
+    cursor_file = file_for_path(view.files, saved_state.cursor.file, saved_state.cursor.side or "new")
+    if cursor_file and saved_state.cursor.line then
       view.state.collapsed_files[cursor_file.id] = false
     end
   end
 
   view:render()
 
-  if state.cursor and cursor_file then
+  if saved_state.cursor and cursor_file then
     local row_index = nil
 
     for idx, row in ipairs(view.display_rows) do
       if row.file_id == cursor_file.id then
-        if state.cursor.line then
+        if saved_state.cursor.line then
           if row.display_kind == "fold" then
             local f, l = row.fold.first_row, row.fold.last_row
-            if state.cursor.line >= f and state.cursor.line <= l then
+            if saved_state.cursor.line >= f and saved_state.cursor.line <= l then
               row_index = idx
               break
             end
           elseif row.display_kind == "line" then
-            local side_line = row.source_row[state.cursor.side .. "_line"]
-            if side_line == state.cursor.line then
+            local side_line = row.source_row[saved_state.cursor.side .. "_line"]
+            if side_line == saved_state.cursor.line then
               row_index = idx
               break
             end
@@ -128,11 +142,11 @@ local function restore_view_state(view, state)
 
     if row_index then
       view:set_cursor_row(row_index)
-    elseif state.cursor.file then
+    elseif saved_state.cursor.file then
       view:open_location({
-        file = state.cursor.file,
-        side = state.cursor.side or "new",
-        line = state.cursor.line or 1,
+        file = saved_state.cursor.file,
+        side = saved_state.cursor.side or "new",
+        line = saved_state.cursor.line or 1,
       })
     end
   end
@@ -146,11 +160,8 @@ local function apply_comments(view, comments, range)
   local locations = {}
   local radius = context_radius(view)
   for _, comment in ipairs(comments) do
-    local location = view:resolve_location(
-      { file = comment.file, side = comment.side, line = comment.line },
-      comment.context,
-      radius
-    )
+    local location =
+      view:resolve_location({ file = comment.file, side = comment.side, line = comment.line }, comment.context, radius)
     locations[comment.id] = location
     if location then
       state.resolved_locations[comment.id] = location
@@ -297,8 +308,7 @@ function M.resolve_comment(comment)
   if state.stale_ids[comment.id] then
     return nil
   end
-  return state.resolved_locations[comment.id]
-    or { file = comment.file, side = comment.side, line = comment.line }
+  return state.resolved_locations[comment.id] or { file = comment.file, side = comment.side, line = comment.line }
 end
 
 return M

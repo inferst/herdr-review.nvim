@@ -28,7 +28,7 @@ local function language_for_path(path)
   return ok and language or nil
 end
 
-local function add_capture_spans(spans, query, node, bufnr, lines)
+local function add_capture_spans(spans, query, node, _, lines)
   local start_row, start_col, end_row, end_col = node:range()
   if start_row == end_row and start_col >= end_col then
     return

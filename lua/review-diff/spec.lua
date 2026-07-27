@@ -20,12 +20,12 @@ function M.parse(args)
     }
   end
 
-  local old, _operator, new = value:match("^(.-)(%.%.%.)(.-)$")
+  local old, _, new = value:match("^(.-)(%.%.%.)(.-)$")
   if old and new and old ~= "" and new ~= "" then
     return { operator = "...", old = endpoint(old), new = endpoint(new) }
   end
 
-  old, _operator, new = value:match("^(.-)(%.%.)(.-)$")
+  old, _, new = value:match("^(.-)(%.%.)(.-)$")
   if old and new and old ~= "" and new ~= "" then
     return { operator = "..", old = endpoint(old), new = endpoint(new) }
   end

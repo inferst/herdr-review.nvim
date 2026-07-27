@@ -128,15 +128,7 @@ function M.build_file(file, opts)
   for _, hunk in ipairs(hunks) do
     local old_start = hunk_line_start(hunk[1], hunk[2])
     local new_start = hunk_line_start(hunk[3], hunk[4])
-    old_cursor, new_cursor = append_context_rows(
-      result.rows,
-      old_lines,
-      new_lines,
-      old_cursor,
-      new_cursor,
-      old_start,
-      new_start
-    )
+    append_context_rows(result.rows, old_lines, new_lines, old_cursor, new_cursor, old_start, new_start)
 
     old_cursor, new_cursor = append_change_rows(result.rows, old_lines, new_lines, hunk)
   end
