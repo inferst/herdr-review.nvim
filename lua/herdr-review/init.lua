@@ -154,6 +154,7 @@ function M.setup(opts)
     algorithm = "histogram",
     intra_line = true,
     collapse_on_open = config.diff.collapse_on_open,
+    line_numbers = config.diff.line_numbers,
     syntax = {
       enabled = true,
       engine = "treesitter",

@@ -14,6 +14,7 @@ M.keymaps = {
 
 M.diff = {
   collapse_on_open = true,
+  line_numbers = true,
 }
 
 return M

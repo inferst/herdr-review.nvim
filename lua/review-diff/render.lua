@@ -31,8 +31,12 @@ end
 
 ---@param row table
 ---@param side "old"|"new"
+---@param opts table|nil
 ---@return integer
-function M.source_prefix_width(row, side)
+function M.source_prefix_width(row, side, opts)
+  if opts and opts.line_numbers == false then
+    return 0
+  end
   local line = source_line(row, side)
   return line and #string.format("%5d │ ", line) or #"      │ "
 end
@@ -104,8 +108,9 @@ end
 ---@param row table
 ---@param side "old"|"new"
 ---@param width integer|nil
+---@param opts table|nil
 ---@return string
-function M.text(row, side, width)
+function M.text(row, side, width, opts)
   if row.display_kind == "empty" then
     return "  " .. row.text
   end
@@ -130,6 +135,12 @@ function M.text(row, side, width)
   else
     line = source_row.new_line
     text = source_row.new_text
+  end
+  if opts and opts.line_numbers == false then
+    if not line and width then
+      return ""
+    end
+    return text or ""
   end
   local prefix = line and string.format("%5d │ ", line) or "      │ "
   if not line and width then
@@ -188,7 +199,7 @@ function M.highlight(row, side, opts)
     return line_hl, nil
   end
 
-  local prefix_width = M.source_prefix_width(row, side)
+  local prefix_width = M.source_prefix_width(row, side, opts)
   if side == "old" then
     return line_hl, { start = prefix_width + range.old_start, finish = prefix_width + range.old_end }
   end

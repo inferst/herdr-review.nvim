@@ -17,6 +17,7 @@ local DEFAULT_OPTIONS = {
   algorithm = "histogram",
   intra_line = false,
   collapse_on_open = true,
+  line_numbers = true,
   syntax = {
     enabled = true,
     engine = "treesitter",
@@ -235,7 +236,7 @@ function View:apply_syntax()
         for _, span in ipairs(cached.spans) do
           local row_index, row = self:location_row({ file = path, side = side, line = span.line })
           if row_index then
-            local prefix_width = render.source_prefix_width(row, side)
+            local prefix_width = render.source_prefix_width(row, side, self.options)
             local start_col = prefix_width + span.start_col
             local end_col = prefix_width + span.end_col
             if end_col > start_col then
@@ -262,7 +263,7 @@ function View:render()
     local width = vim.api.nvim_win_get_width(self[side .. "_win"])
     local lines = {}
     for _, row in ipairs(self.display_rows) do
-      table.insert(lines, render.text(row, side, width))
+      table.insert(lines, render.text(row, side, width, self.options))
     end
 
     vim.bo[bufnr].modifiable = true
@@ -276,7 +277,7 @@ function View:render()
         local col_start = 0
         local col_end = #lines[index]
         if row.display_kind == "line" then
-          col_start = render.source_prefix_width(row, side)
+          col_start = render.source_prefix_width(row, side, self.options)
         end
         vim.api.nvim_buf_set_extmark(bufnr, render_ns, index - 1, col_start, {
           end_col = col_end,

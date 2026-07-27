@@ -91,6 +91,7 @@ require("herdr-review").setup({
     context_lines = 3,
     ignore_whitespace = false,
     intra_line = false,
+    line_numbers = true,
     syntax = {
       enabled = true,
       engine = "treesitter",
