@@ -2,8 +2,6 @@
 
 Code review UI for Neovim with Git and [herdr](https://github.com/herdr/herdr) integration.
 
-The plugin opens a dedicated review tab with two read-only columns: the old file on the left and the new file on the right. It does not depend on Diffview.nvim.
-
 https://github.com/user-attachments/assets/da92b09d-4720-44bd-bc56-01f9cbd11113
 
 ## Features
@@ -106,8 +104,6 @@ require("herdr-review").setup({
 })
 ```
 
-Review buffers are unlisted, read-only scratch buffers. The review tab is reused when `:ReviewDiff` is invoked again.
-
 ## Viewer interface
 
 The standalone viewer lives under the `review-diff` namespace and can be used with a resolved model independent of Git:
@@ -135,7 +131,7 @@ The viewer exposes source locations, source context, file metadata, review ident
 
 ## Storage
 
-Comments are stored under `stdpath("data") .. "/herdr-review/sessions"` using schema version 3. The session key includes the repository root and resolved Git object IDs. Existing Diffview-era sessions are left untouched and are not migrated.
+Comments are stored under `stdpath("data") .. "/herdr-review/sessions"` using schema version 3. The session key includes the repository root and resolved Git object IDs.
 
 ## Development
 
