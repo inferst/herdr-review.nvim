@@ -18,6 +18,7 @@ local DEFAULT_OPTIONS = {
   intra_line = false,
   collapse_on_open = false,
   line_numbers = true,
+  highlights = "default",
   syntax = {
     enabled = true,
     engine = "treesitter",
@@ -62,11 +63,21 @@ local function valid_window(win)
   return win and vim.api.nvim_win_is_valid(win)
 end
 
-local function set_default_highlights()
-  vim.api.nvim_set_hl(0, "ReviewDiffAdd", { link = "DiffAdd", default = true })
-  vim.api.nvim_set_hl(0, "ReviewDiffDelete", { link = "DiffDelete", default = true })
-  vim.api.nvim_set_hl(0, "ReviewDiffChange", { link = "DiffChange", default = true })
-  vim.api.nvim_set_hl(0, "ReviewDiffText", { link = "DiffText", default = true })
+local function set_default_highlights(opts)
+  if opts.highlights == "default" then
+    vim.api.nvim_set_hl(0, "ReviewDiffAdd",        { bg = "#2e3a2e", default = true })
+    vim.api.nvim_set_hl(0, "ReviewDiffDelete",     { bg = "#3a2e2e", default = true })
+    vim.api.nvim_set_hl(0, "ReviewDiffChange",     { bg = "#2e2e3a", default = true })
+    vim.api.nvim_set_hl(0, "ReviewDiffAddIntra",   { bg = "#2a6a2a", default = true })
+    vim.api.nvim_set_hl(0, "ReviewDiffDeleteIntra",{ bg = "#6a2a2a", default = true })
+  else
+    vim.api.nvim_set_hl(0, "ReviewDiffAdd",        { link = "DiffAdd", default = true })
+    vim.api.nvim_set_hl(0, "ReviewDiffDelete",     { link = "DiffDelete", default = true })
+    vim.api.nvim_set_hl(0, "ReviewDiffChange",     { link = "DiffChange", default = true })
+    vim.api.nvim_set_hl(0, "ReviewDiffText",       { link = "DiffText", default = true })
+    vim.api.nvim_set_hl(0, "ReviewDiffAddIntra",   { link = "DiffText", default = true })
+    vim.api.nvim_set_hl(0, "ReviewDiffDeleteIntra",{ link = "DiffText", default = true })
+  end
   vim.api.nvim_set_hl(0, "ReviewDiffFileHeader", { link = "Title", default = true })
   vim.api.nvim_set_hl(0, "ReviewDiffFold", { link = "Comment", default = true })
   vim.api.nvim_set_hl(0, "ReviewDiffMetadata", { link = "WarningMsg", default = true })
@@ -293,7 +304,7 @@ function View:render()
         vim.api.nvim_buf_set_extmark(bufnr, render_ns, index - 1, inline.start, {
           end_row = index - 1,
           end_col = inline.finish,
-          hl_group = "ReviewDiffText",
+          hl_group = inline.hl_group,
           priority = 80,
         })
       end
@@ -1010,7 +1021,7 @@ end
 ---@return table
 function M.open(input, opts)
   opts = vim.tbl_deep_extend("force", vim.deepcopy(DEFAULT_OPTIONS), M.options or {}, opts or {})
-  set_default_highlights()
+  set_default_highlights(opts)
   view_counter = view_counter + 1
 
   if active_view and not active_view.closed then
