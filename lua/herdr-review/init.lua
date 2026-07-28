@@ -86,6 +86,23 @@ local function attach_view(view)
     desc = "Herdr Review: Send to agent",
     callback = ui.send_to_agent,
   })
+  if config.diff.show_hint then
+    local hint_keys = {
+      "?", "<Tab>",
+      config.keymaps.create_comment,
+      config.keymaps.open_list,
+      config.keymaps.send_to_agent,
+      "R",
+    }
+    local parts = {}
+    for _, key in ipairs(hint_keys) do
+      local desc = view.keymaps[key]
+      if desc then
+        table.insert(parts, key .. " " .. desc)
+      end
+    end
+    view.hint_text = "Hint: " .. table.concat(parts, " | ")
+  end
   session.on_view_opened(view)
 end
 
