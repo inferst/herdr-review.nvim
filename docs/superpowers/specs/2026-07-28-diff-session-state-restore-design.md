@@ -97,6 +97,12 @@ closed review tab. On the next view open it loads comments, applies a matching
 pending snapshot, and clears the snapshot. A mismatched `review_id` discards
 the pending state immediately.
 
+The temporary loading view (`review_id = "loading"`) is not a real review and
+must not consume pending state. When a new review starts from a closed view,
+`herdr-review.init` peeks the pending snapshot and passes it to the first real
+`View:replace()` after Git resolution; the actual review-open callback then
+consumes the matching pending snapshot.
+
 The pending snapshot remains in memory only. Comment storage continues to use
 the existing schema and files.
 

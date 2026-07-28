@@ -212,6 +212,11 @@ snapshot shape is:
   call `session.on_view_opened(other_view)`, then open the original review and
   assert the old snapshot was discarded rather than applied later.
 
+  Add a loading-transition test: close a configured view, open a temporary
+  `review_id = "loading"` view, call `session.on_view_opened(loading_view)`,
+  and assert the pending snapshot remains available until the real review
+  replacement opens.
+
 - [ ] **Step 2: Run the focused session tests and verify they expose the old implementation.**
 
   Run:
@@ -283,8 +288,10 @@ snapshot shape is:
   In `start_review()`, when `viewer.current()` returns an existing view, call
   `view:capture_state()` before `set_origin()`, `focus()`, or launching the new
   Git resolve. Pass the captured state to `view:replace()` in the `on_ready`
-  callback. Keep the loading-view path unchanged except that its first real
-  replacement must not restore the temporary `review_id = "loading"` state.
+  callback. In the no-view branch, peek the pending snapshot from
+  `session.get_pending_view_state()` before creating the temporary loading
+  view; the loading view must not consume that snapshot, and the first real
+  replacement receives it explicitly.
 
 - [ ] **Step 3: Run the full automated suite and inspect the integration diff.**
 
