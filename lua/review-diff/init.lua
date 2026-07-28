@@ -19,6 +19,7 @@ local DEFAULT_OPTIONS = {
   collapse_on_open = false,
   line_numbers = true,
   highlights = "default",
+  max_file_size = 1000000,
   syntax = {
     enabled = true,
     engine = "treesitter",

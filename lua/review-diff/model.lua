@@ -147,6 +147,14 @@ function M.build_file(file, opts)
     return result
   end
 
+  local total_size = (file.old_text and #file.old_text or 0) + (file.new_text and #file.new_text or 0)
+  if total_size > (opts.max_file_size or 1000000) then
+    result.too_large = true
+    result.rows = {}
+    result.hunks = {}
+    return result
+  end
+
   local diff_opts = { result_type = "indices", algorithm = opts.algorithm or "histogram" }
   if opts.ignore_whitespace then
     diff_opts.ignore_whitespace = true
