@@ -6,6 +6,48 @@ describe("review session", function()
   local data_dir
   local view
 
+  local function state_input(review_id)
+    return {
+      repo_root = vim.fn.getcwd(),
+      review_id = review_id,
+      spec = { old = { kind = "ref", name = "HEAD" }, new = { kind = "worktree" } },
+      files = {
+        {
+          id = "lua/a.lua",
+          old_path = "lua/a.lua",
+          new_path = "lua/a.lua",
+          old_text = "one\ntwo\nthree\nfour\nfive\nsix\nseven\neight",
+          new_text = "one\ntwo\nTHREE\nfour\nfive\nsix\nseven\neight",
+          status = "modified",
+        },
+        {
+          id = "lua/b.lua",
+          old_path = "lua/b.lua",
+          new_path = "lua/b.lua",
+          old_text = "alpha\nbeta",
+          new_text = "alpha\nBETA",
+          status = "modified",
+        },
+      },
+    }
+  end
+
+  local function set_cursor_at_location(current_view, location)
+    local row_index = current_view:location_row(location)
+    assert.is_truthy(row_index)
+    local win = current_view[location.side .. "_win"]
+    vim.api.nvim_set_current_win(win)
+    vim.api.nvim_win_set_cursor(win, { row_index, 0 })
+  end
+
+  local function first_fold_key(current_view, file_id)
+    for _, row in ipairs(current_view.display_rows) do
+      if row.file_id == file_id and row.display_kind == "fold" then
+        return string.format("%s:%d:%d", file_id, row.fold.first_row, row.fold.last_row)
+      end
+    end
+  end
+
   before_each(function()
     data_dir = vim.fn.tempname()
     config.data_dir = data_dir
@@ -98,5 +140,54 @@ describe("review session", function()
     local stored = storage.get_comments("HEAD..WORKTREE")
     assert.are.equal(3, stored[1].line)
     assert.is_false(session.is_stale("comment-anchor"))
+  end)
+
+  it("restores matching view state after closing and reopening a review", function()
+    view.options.context_lines = 1
+    view.options.collapse_on_open = true
+    view.options.syntax = false
+    view:replace(state_input("session-state"))
+    view.state.collapsed_files["lua/a.lua"] = false
+    view.state.collapsed_files["lua/b.lua"] = true
+    view:render()
+    local fold_key = first_fold_key(view, "lua/a.lua")
+    assert.is_truthy(fold_key)
+    view.state.expanded_folds[fold_key] = true
+    set_cursor_at_location(view, { file = "lua/a.lua", side = "old", line = 3 })
+    session.on_view_opened(view)
+
+    session.on_view_closed(view)
+    view:close()
+    view = viewer.open(state_input("session-state"), { context_lines = 1, collapse_on_open = true, syntax = false })
+    session.on_view_opened(view)
+
+    assert.is_false(view.state.collapsed_files["lua/a.lua"])
+    assert.is_true(view.state.collapsed_files["lua/b.lua"])
+    assert.is_true(view.state.expanded_folds[fold_key])
+    vim.api.nvim_set_current_win(view.old_win)
+    assert.are.same({ file = "lua/a.lua", side = "old", line = 3 }, view:get_cursor_location())
+  end)
+
+  it("discards pending state when another review opens first", function()
+    view.options.context_lines = 1
+    view.options.collapse_on_open = true
+    view.options.syntax = false
+    view:replace(state_input("session-state-old"))
+    view.state.collapsed_files["lua/a.lua"] = false
+    view:render()
+    set_cursor_at_location(view, { file = "lua/a.lua", side = "new", line = 3 })
+    session.on_view_opened(view)
+
+    session.on_view_closed(view)
+    view:close()
+    view =
+      viewer.open(state_input("session-state-other"), { context_lines = 1, collapse_on_open = true, syntax = false })
+    session.on_view_opened(view)
+    assert.is_true(view.state.collapsed_files["lua/a.lua"])
+
+    view:close()
+    view = viewer.open(state_input("session-state-old"), { context_lines = 1, collapse_on_open = true, syntax = false })
+    session.on_view_opened(view)
+    assert.is_true(view.state.collapsed_files["lua/a.lua"])
   end)
 end)
