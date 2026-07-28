@@ -462,33 +462,7 @@ function View:render()
   end
   self.rendering = false
 
-  self._row_index = { by_location = {}, by_file_header = {}, by_file_range = {} }
-  for index, row in ipairs(self.display_rows) do
-    if row.display_kind == "line" and row.file_id and row.source_row then
-      local by_file = self._row_index.by_location[row.file_id]
-      if not by_file then
-        by_file = {}
-        self._row_index.by_location[row.file_id] = by_file
-      end
-      for _, side in ipairs({ "old", "new" }) do
-        local line = row.source_row[side .. "_line"]
-        if line then
-          by_file[side .. "_" .. line] = index
-        end
-      end
-    elseif row.display_kind == "file_header" and row.file_id then
-      self._row_index.by_file_header[row.file_id] = index
-    end
-    if row.file_id then
-      local range = self._row_index.by_file_range[row.file_id]
-      if not range then
-        range = { first = index, last = index }
-        self._row_index.by_file_range[row.file_id] = range
-      else
-        range.last = index
-      end
-    end
-  end
+  self:_rebuild_row_index()
 
   self:apply_annotations()
   self:update_cursorline()
@@ -633,6 +607,94 @@ function View:_file_row_range(file_id)
     return self._row_index.by_file_range[file_id]
   end
   return nil
+end
+
+function View:_rebuild_row_index()
+  self._row_index = { by_location = {}, by_file_header = {}, by_file_range = {} }
+  for index, row in ipairs(self.display_rows) do
+    if row.display_kind == "line" and row.file_id and row.source_row then
+      local by_file = self._row_index.by_location[row.file_id]
+      if not by_file then
+        by_file = {}
+        self._row_index.by_location[row.file_id] = by_file
+      end
+      for _, side in ipairs({ "old", "new" }) do
+        local line = row.source_row[side .. "_line"]
+        if line then
+          by_file[side .. "_" .. line] = index
+        end
+      end
+    elseif row.display_kind == "file_header" and row.file_id then
+      self._row_index.by_file_header[row.file_id] = index
+    end
+    if row.file_id then
+      local range = self._row_index.by_file_range[row.file_id]
+      if not range then
+        range = { first = index, last = index }
+        self._row_index.by_file_range[row.file_id] = range
+      else
+        range.last = index
+      end
+    end
+  end
+end
+
+function View:_build_file_rows(file_id)
+  local rows = {}
+  for _, file in ipairs(self.files) do
+    if file.id == file_id then
+      table.insert(rows, {
+        display_kind = "file_header",
+        file = file,
+        file_id = file.id,
+        collapsed = self.state.collapsed_files[file.id] == true,
+      })
+      if not self.state.collapsed_files[file.id] then
+        if file.binary or file.too_large then
+          table.insert(rows, {
+            display_kind = "metadata",
+            file = file,
+            file_id = file.id,
+            text = file.binary and "binary file changed" or "file is too large to diff",
+          })
+        else
+          local visible_rows = model.visible_rows(file, self.state.context_lines)
+          for _, row in ipairs(visible_rows) do
+            if
+              row.kind == "fold"
+              and self.state.expanded_folds[string.format("%s:%d:%d", file.id, row.first_row, row.last_row)]
+            then
+              for source_index = row.first_row, row.last_row do
+                table.insert(rows, {
+                  display_kind = "line",
+                  file = file,
+                  file_id = file.id,
+                  source_row = file.rows[source_index],
+                })
+              end
+            elseif row.kind == "fold" then
+              table.insert(rows, {
+                display_kind = "fold",
+                file = file,
+                file_id = file.id,
+                fold = row,
+                expanded = false,
+              })
+            else
+              table.insert(rows, {
+                display_kind = "line",
+                file = file,
+                file_id = file.id,
+                source_row = row,
+              })
+            end
+          end
+        end
+      end
+      break
+    end
+  end
+  return rows
 end
 
 function View:expand_source_row(file, source_index)
@@ -799,8 +861,71 @@ function View:toggle_file_at_cursor()
     return
   end
   local file_id = row.file_id
+
+  local file_range = self:_file_row_range(file_id)
+  if not file_range then
+    return
+  end
+
   self.state.collapsed_files[file_id] = not self.state.collapsed_files[file_id]
-  self:render()
+
+  local new_rows = self:_build_file_rows(file_id)
+  local old_count = file_range.last - file_range.first + 1
+  local new_count = #new_rows
+
+  for i = old_count, 1, -1 do
+    table.remove(self.display_rows, file_range.first)
+  end
+  for i, r in ipairs(new_rows) do
+    table.insert(self.display_rows, file_range.first + i - 1, r)
+  end
+
+  for _, side in ipairs({ "old", "new" }) do
+    local bufnr = self[side .. "_buf"]
+    local width = vim.api.nvim_win_get_width(self[side .. "_win"])
+    local lines = {}
+    for _, r in ipairs(new_rows) do
+      table.insert(lines, render.text(r, side, width, self.options))
+    end
+
+    vim.bo[bufnr].modifiable = true
+    vim.api.nvim_buf_set_lines(bufnr, file_range.first - 1, file_range.first - 1 + old_count, false, lines)
+    vim.bo[bufnr].modifiable = false
+
+    vim.api.nvim_buf_clear_namespace(bufnr, render_ns, file_range.first - 1, file_range.first - 1 + old_count)
+
+    for local_index, r in ipairs(new_rows) do
+      local global_index = file_range.first + local_index - 1
+      local line_hl, inline = render.highlight(r, side, self.options)
+      if line_hl then
+        local col_start = 0
+        if r.display_kind == "line" then
+          col_start = render.source_prefix_width(r, side, self.options)
+        end
+        vim.api.nvim_buf_set_extmark(bufnr, render_ns, global_index - 1, col_start, {
+          end_row = global_index,
+          end_col = 0,
+          hl_group = line_hl,
+          hl_eol = true,
+          priority = 50,
+        })
+      end
+      if inline and inline.finish > inline.start then
+        vim.api.nvim_buf_set_extmark(bufnr, render_ns, global_index - 1, inline.start, {
+          end_row = global_index - 1,
+          end_col = inline.finish,
+          hl_group = inline.hl_group,
+          priority = 80,
+        })
+      end
+    end
+  end
+
+  self:_rebuild_row_index()
+  self:apply_annotations()
+  self:update_cursorline()
+  self:emit("rendered")
+
   if self.state.collapsed_files[file_id] then
     for index, display_row in ipairs(self.display_rows) do
       if display_row.file_id == file_id then
