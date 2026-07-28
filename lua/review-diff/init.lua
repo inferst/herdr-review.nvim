@@ -1348,7 +1348,7 @@ function View:replace(input, opts)
   self.syntax_cache = {}
   self.state.context_lines = self.options.context_lines
   self.state.empty_text = input.empty_text or "No changes"
-  self.state.collapsed_files = {}
+  self.state.collapsed_files = same_review and vim.deepcopy(snapshot.collapsed_files or {}) or {}
   self.state.expanded_folds = same_review and vim.deepcopy(snapshot.expanded_folds or {}) or {}
 
   self._build_generation = (self._build_generation or 0) + 1
@@ -1371,7 +1371,9 @@ function View:replace(input, opts)
       return
     end
     table.insert(self.files, file)
-    self.state.collapsed_files[file.id] = self.options.collapse_on_open
+    if self.state.collapsed_files[file.id] == nil then
+      self.state.collapsed_files[file.id] = self.options.collapse_on_open
+    end
     self.hint_text = string.format("Processing %d/%d… %s", current, total, file.new_path or file.old_path or "")
     self:render()
   end, function(result)
