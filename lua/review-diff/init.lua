@@ -854,24 +854,14 @@ function View:set_cursor_row(row_index)
   self:update_cursorline()
 end
 
-function View:toggle_file_at_cursor()
-  local cursor = vim.api.nvim_win_get_cursor(vim.api.nvim_get_current_win())
-  local row = self.display_rows[cursor[1]]
-  if not row or not row.file_id then
-    return
-  end
-  local file_id = row.file_id
-
+function View:_replace_file_rows(file_id)
   local file_range = self:_file_row_range(file_id)
   if not file_range then
     return
   end
 
-  self.state.collapsed_files[file_id] = not self.state.collapsed_files[file_id]
-
   local new_rows = self:_build_file_rows(file_id)
   local old_count = file_range.last - file_range.first + 1
-  local new_count = #new_rows
 
   for i = old_count, 1, -1 do
     table.remove(self.display_rows, file_range.first)
@@ -925,6 +915,19 @@ function View:toggle_file_at_cursor()
   self:apply_annotations()
   self:update_cursorline()
   self:emit("rendered")
+end
+
+function View:toggle_file_at_cursor()
+  local cursor = vim.api.nvim_win_get_cursor(vim.api.nvim_get_current_win())
+  local row = self.display_rows[cursor[1]]
+  if not row or not row.file_id then
+    return
+  end
+  local file_id = row.file_id
+
+  self.state.collapsed_files[file_id] = not self.state.collapsed_files[file_id]
+
+  self:_replace_file_rows(file_id)
 
   if self.state.collapsed_files[file_id] then
     for index, display_row in ipairs(self.display_rows) do
@@ -951,7 +954,9 @@ function View:toggle_fold_at_cursor()
     local key = string.format("%s:%d:%d", file_id, target_first, target_last)
     local was_expanded = self.state.expanded_folds[key]
     self.state.expanded_folds[key] = not was_expanded
-    self:render()
+
+    self:_replace_file_rows(file_id)
+
     if was_expanded then
       for index, display_row in ipairs(self.display_rows) do
         if
