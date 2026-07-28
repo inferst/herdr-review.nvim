@@ -131,6 +131,68 @@ local function location_path(file, side)
   return file.new_path
 end
 
+local function cursor_location_for_window(view, win)
+  if not valid_window(win) then
+    return nil
+  end
+  local side = view.win_sides[win]
+  if not side then
+    return nil
+  end
+  local cursor = vim.api.nvim_win_get_cursor(win)
+  local row = view.display_rows[cursor[1]]
+  if not row or row.display_kind ~= "line" then
+    return nil
+  end
+  local line = row.source_row[side .. "_line"]
+  local path = location_path(row.file, side)
+  if not line or not path then
+    return nil
+  end
+  return { file = normalize_path(path), side = side, line = line }
+end
+
+local function cursor_anchor_for_window(view, win)
+  if not valid_window(win) then
+    return nil
+  end
+  local side = view.win_sides[win]
+  if not side then
+    return nil
+  end
+  local cursor = vim.api.nvim_win_get_cursor(win)
+  local row = view.display_rows[cursor[1]]
+  if not row or not row.file then
+    return nil
+  end
+
+  local path = location_path(row.file, side)
+  if not path then
+    return nil
+  end
+  local location = { file = normalize_path(path), side = side }
+  if row.display_kind == "line" then
+    location.line = row.source_row[side .. "_line"]
+  elseif row.display_kind == "fold" then
+    local source_row = row.file.rows[row.fold.first_row]
+    location.line = source_row and source_row[side .. "_line"] or nil
+  end
+  return location
+end
+
+local function fold_contains_line(row, side, line)
+  if not row.fold or not line then
+    return false
+  end
+  for source_index = row.fold.first_row, row.fold.last_row do
+    local source_row = row.file.rows[source_index]
+    if source_row and source_row[side .. "_line"] == line then
+      return true
+    end
+  end
+  return false
+end
+
 local function file_metadata(file)
   return {
     id = file.id,
@@ -200,6 +262,86 @@ function View:set_origin(win)
     win = win,
     bufnr = vim.api.nvim_win_get_buf(win),
   }
+end
+
+---@return table|nil
+function View:capture_state()
+  local review_id = self:get_review_id()
+  if not review_id then
+    return nil
+  end
+
+  local snapshot = {
+    review_id = review_id,
+    collapsed_files = vim.deepcopy(self.state.collapsed_files),
+    expanded_folds = vim.deepcopy(self.state.expanded_folds),
+  }
+
+  local current_win = vim.api.nvim_get_current_win()
+  local current_side = self.win_sides[current_win]
+  local side = current_side or self.last_side
+  if current_side then
+    self.last_side = current_side
+  end
+  local win = side and self[side .. "_win"] or nil
+  snapshot.cursor = cursor_location_for_window(self, win) or cursor_anchor_for_window(self, win)
+  return snapshot
+end
+
+---@param snapshot table|nil
+function View:restore_state(snapshot)
+  if not snapshot or snapshot.review_id ~= self:get_review_id() then
+    return
+  end
+
+  for id, collapsed in pairs(snapshot.collapsed_files or {}) do
+    if self.state.collapsed_files[id] ~= nil then
+      self.state.collapsed_files[id] = collapsed
+    end
+  end
+  self.state.expanded_folds = vim.deepcopy(snapshot.expanded_folds or {})
+
+  local cursor = snapshot.cursor
+  local cursor_side = cursor and (cursor.side == "old" or cursor.side == "new") and cursor.side or nil
+  local cursor_file = cursor_side and file_for_location(self.files, cursor) or nil
+  if cursor_file and cursor.line then
+    self.state.collapsed_files[cursor_file.id] = false
+  end
+
+  self:render()
+
+  if not cursor_file then
+    return
+  end
+
+  local row_index
+  local header_index
+  for index, row in ipairs(self.display_rows) do
+    if row.file_id == cursor_file.id then
+      if row.display_kind == "file_header" then
+        header_index = index
+      elseif cursor.line and row.display_kind == "fold" and fold_contains_line(row, cursor_side, cursor.line) then
+        row_index = index
+        break
+      elseif cursor.line and row.display_kind == "line" then
+        local side_line = row.source_row[cursor_side .. "_line"]
+        if side_line == cursor.line then
+          row_index = index
+          break
+        end
+      elseif not cursor.line and row.display_kind == "file_header" then
+        row_index = index
+        break
+      end
+    end
+  end
+
+  row_index = row_index or header_index
+  if row_index then
+    self.last_side = cursor_side
+    self:set_cursor_row(row_index)
+    self.last_side = cursor_side
+  end
 end
 
 function View:get_files()
@@ -504,6 +646,7 @@ function View:open_location(location)
   end
   vim.api.nvim_set_current_tabpage(self.tabpage)
   vim.api.nvim_set_current_win(win)
+  self.last_side = location.side
   vim.api.nvim_win_set_cursor(win, { row_index, 0 })
   return true, nil
 end
@@ -518,24 +661,7 @@ function View:focus()
 end
 
 function View:get_cursor_location()
-  local current_win = vim.api.nvim_get_current_win()
-  local side = self.win_sides[current_win]
-  if not side then
-    return nil
-  end
-  local cursor = vim.api.nvim_win_get_cursor(current_win)
-  local row = self.display_rows[cursor[1]]
-  if not row or row.display_kind ~= "line" then
-    return nil
-  end
-  local source_row = row.source_row
-  local line = source_row[side .. "_line"]
-  local file = row.file
-  local path = location_path(file, side)
-  if not line or not path then
-    return nil
-  end
-  return { file = normalize_path(path), side = side, line = line }
+  return cursor_location_for_window(self, vim.api.nvim_get_current_win())
 end
 
 ---@param location table
@@ -608,6 +734,10 @@ function View:set_cursor_row(row_index)
   end
   row_index = math.max(1, math.min(#self.display_rows, row_index))
   local current_win = vim.api.nvim_get_current_win()
+  local current_side = self.win_sides[current_win]
+  if current_side then
+    self.last_side = current_side
+  end
   local current_cursor = valid_window(current_win) and vim.api.nvim_win_get_cursor(current_win) or { 1, 0 }
   for _, side in ipairs({ "old", "new" }) do
     local win = self[side .. "_win"]
@@ -1000,8 +1130,9 @@ function View:open_source_at_cursor()
   return true, nil
 end
 
-function View:replace(input)
-  local previous_collapsed = self.state.collapsed_files
+function View:replace(input, opts)
+  local snapshot = opts and opts.state or self:capture_state()
+  local same_review = snapshot and snapshot.review_id == input.review_id
   self.input = vim.deepcopy(input)
   self.files = model.build(input.files or {}, self.options).files
   self.syntax_cache = {}
@@ -1009,12 +1140,16 @@ function View:replace(input)
   self.state.empty_text = input.empty_text or "No changes"
   self.state.collapsed_files = {}
   for _, file in ipairs(self.files) do
-    self.state.collapsed_files[file.id] = previous_collapsed[file.id] or self.options.collapse_on_open
+    local saved = same_review and (snapshot.collapsed_files or {})[file.id] or nil
+    self.state.collapsed_files[file.id] = saved ~= nil and saved or self.options.collapse_on_open
   end
-  self.state.expanded_folds = {}
+  self.state.expanded_folds = same_review and vim.deepcopy(snapshot.expanded_folds or {}) or {}
   self:render()
   self:place_initial_cursor()
   self:emit("ready")
+  if same_review then
+    self:restore_state(snapshot)
+  end
 end
 
 function View:place_initial_cursor()
@@ -1119,6 +1254,7 @@ local function setup_autocmds(view)
       buffer = view[side .. "_buf"],
       callback = function()
         if not view.closed and not view.rendering then
+          view.last_side = side
           view:sync_cursor()
           view:update_cursorline()
           view:emit("cursor_moved", view:get_cursor_location())
@@ -1200,6 +1336,7 @@ function M.open(input, opts)
     syntax_cache = {},
     keymaps = {},
     win_sides = {},
+    last_side = "new",
     state = {
       context_lines = opts.context_lines,
       collapsed_files = {},

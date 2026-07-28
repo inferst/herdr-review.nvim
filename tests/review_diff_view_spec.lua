@@ -386,6 +386,151 @@ describe("review diff view", function()
     assert.are.same({ file = "lua/example.lua", side = "old", line = 5 }, view:get_cursor_location())
   end)
 
+  local function state_input(review_id)
+    return {
+      repo_root = vim.fn.getcwd(),
+      review_id = review_id,
+      spec = { old = { kind = "ref", name = "HEAD" }, new = { kind = "worktree" } },
+      files = {
+        {
+          id = "lua/a.lua",
+          old_path = "lua/a.lua",
+          new_path = "lua/a.lua",
+          old_text = "one\ntwo\nthree\nfour\nfive\nsix\nseven\neight",
+          new_text = "one\ntwo\nTHREE\nfour\nfive\nsix\nseven\neight",
+          status = "modified",
+        },
+        {
+          id = "lua/b.lua",
+          old_path = "lua/b.lua",
+          new_path = "lua/b.lua",
+          old_text = "alpha\nbeta",
+          new_text = "alpha\nBETA",
+          status = "modified",
+        },
+      },
+    }
+  end
+
+  local function set_cursor_at_location(current_view, location)
+    local row_index = current_view:location_row(location)
+    assert.is_truthy(row_index)
+    vim.api.nvim_set_current_win(current_view[location.side .. "_win"])
+    vim.api.nvim_win_set_cursor(current_view[location.side .. "_win"], { row_index, 0 })
+  end
+
+  it("captures layout and side-specific cursor state", function()
+    view = viewer.open(state_input("review-state-capture"), { context_lines = 1, syntax = false })
+    view.state.collapsed_files["lua/a.lua"] = false
+    view.state.collapsed_files["lua/b.lua"] = true
+    view:render()
+
+    local fold
+    for _, row in ipairs(view.display_rows) do
+      if row.file_id == "lua/a.lua" and row.display_kind == "fold" then
+        fold = row
+        break
+      end
+    end
+    assert.is_truthy(fold)
+    local fold_key = string.format("%s:%d:%d", fold.file_id, fold.fold.first_row, fold.fold.last_row)
+    view.state.expanded_folds[fold_key] = true
+
+    set_cursor_at_location(view, { file = "lua/a.lua", side = "old", line = 3 })
+    local snapshot = view:capture_state()
+
+    assert.are.equal("review-state-capture", snapshot.review_id)
+    assert.is_false(snapshot.collapsed_files["lua/a.lua"])
+    assert.is_true(snapshot.collapsed_files["lua/b.lua"])
+    assert.is_true(snapshot.expanded_folds[fold_key])
+    assert.are.same({ file = "lua/a.lua", side = "old", line = 3 }, snapshot.cursor)
+  end)
+
+  it("captures the last diff cursor after focus moves to the originating tab", function()
+    view = viewer.open(state_input("review-state-focus-away"), { context_lines = 1, syntax = false })
+    view.state.collapsed_files["lua/a.lua"] = false
+    view:render()
+    set_cursor_at_location(view, { file = "lua/a.lua", side = "new", line = 3 })
+
+    vim.api.nvim_set_current_tabpage(view.origin.tabpage)
+    vim.api.nvim_set_current_win(view.origin.win)
+
+    local snapshot = view:capture_state()
+
+    assert.are.same({ file = "lua/a.lua", side = "new", line = 3 }, snapshot.cursor)
+  end)
+
+  it("captures the path from the active side for renamed files", function()
+    view = viewer.open({
+      repo_root = vim.fn.getcwd(),
+      review_id = "review-state-rename",
+      spec = { old = { kind = "ref", name = "HEAD" }, new = { kind = "worktree" } },
+      files = {
+        {
+          id = "old.lua\0new.lua",
+          old_path = "old.lua",
+          new_path = "new.lua",
+          old_text = "old line",
+          new_text = "new line",
+          status = "renamed",
+        },
+      },
+    }, { syntax = false })
+    set_cursor_at_location(view, { file = "old.lua", side = "old", line = 1 })
+
+    local snapshot = view:capture_state()
+
+    assert.are.same({ file = "old.lua", side = "old", line = 1 }, snapshot.cursor)
+  end)
+
+  it("restores state after ready callbacks during same-review replacement", function()
+    view =
+      viewer.open(state_input("review-state-replace"), { context_lines = 1, collapse_on_open = true, syntax = false })
+    view.state.collapsed_files["lua/a.lua"] = false
+    view.state.collapsed_files["lua/b.lua"] = true
+    view:render()
+
+    local fold
+    for _, row in ipairs(view.display_rows) do
+      if row.file_id == "lua/a.lua" and row.display_kind == "fold" then
+        fold = row
+        break
+      end
+    end
+    assert.is_truthy(fold)
+    local fold_key = string.format("%s:%d:%d", fold.file_id, fold.fold.first_row, fold.fold.last_row)
+    view.state.expanded_folds[fold_key] = true
+    set_cursor_at_location(view, { file = "lua/a.lua", side = "new", line = 3 })
+    local snapshot = view:capture_state()
+
+    local remove_ready = view:on("ready", function(current_view)
+      current_view.state.collapsed_files["lua/a.lua"] = true
+      current_view.state.expanded_folds = {}
+    end)
+    view:replace(state_input("review-state-replace"), { state = snapshot })
+    remove_ready()
+
+    assert.is_false(view.state.collapsed_files["lua/a.lua"])
+    assert.is_true(view.state.collapsed_files["lua/b.lua"])
+    assert.is_true(view.state.expanded_folds[fold_key])
+    assert.are.same({ file = "lua/a.lua", side = "new", line = 3 }, view:get_cursor_location())
+  end)
+
+  it("resets the layout when replacement changes the review identity", function()
+    view = viewer.open(state_input("review-state-old"), { context_lines = 1, collapse_on_open = true, syntax = false })
+    view.state.collapsed_files["lua/a.lua"] = false
+    view:render()
+    set_cursor_at_location(view, { file = "lua/a.lua", side = "new", line = 3 })
+    local snapshot = view:capture_state()
+
+    view:replace(state_input("review-state-new"), { state = snapshot })
+
+    assert.is_true(view.state.collapsed_files["lua/a.lua"])
+    assert.is_true(view.state.collapsed_files["lua/b.lua"])
+    assert.are.equal(1, vim.api.nvim_win_get_cursor(view.new_win)[1])
+    assert.are.same({}, view.state.expanded_folds)
+  end)
+
   it("invalidates itself when the review tab is closed externally", function()
     view = viewer.open({
       repo_root = vim.fn.getcwd(),
