@@ -71,9 +71,9 @@ Old-side and historical new-side `<CR>` targets are intentionally not opened in 
 
 | Key | Action |
 |-----|--------|
-| `rc` | Add or edit a comment on the current source line |
-| `rl` | Open the comment list |
-| `rs` | Send non-stale comments to a herdr agent |
+| `cc` | Add or edit a comment on the current source line |
+| `cl` | Open the comment list |
+| `cs` | Send non-stale comments to a herdr agent |
 
 Comment-list keybindings remain `<CR>` to jump, `e` to edit, `d` to delete, and `q`/`<Esc>` to close.
 
@@ -92,9 +92,9 @@ require("herdr-review").setup({
     max_file_lines = 100000,
   },
   keymaps = {
-    create_comment = "rc",
-    open_list = "rl",
-    send_to_agent = "rs",
+    create_comment = "cc",
+    open_list = "cl",
+    send_to_agent = "cs",
   },
 })
 ```

@@ -35,9 +35,9 @@ plenary.nvim, and a running `herdr` server:
 
 ```vim
 :DiffviewOpen
-<leader>rc
-<leader>rl
-<leader>rs
+cc
+cl
+cs
 ```
 
 Check the working tree with `git status --short` before committing. CI runs

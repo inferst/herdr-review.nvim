@@ -7,9 +7,9 @@ M.data_dir = vim.fn.stdpath("data") .. "/herdr-review"
 M.list_width = 80
 
 M.keymaps = {
-  create_comment = "rc",
-  open_list = "rl",
-  send_to_agent = "rs",
+  create_comment = "cc",
+  open_list = "cl",
+  send_to_agent = "cs",
 }
 
 M.highlights = "default"
