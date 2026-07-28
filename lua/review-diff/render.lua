@@ -265,11 +265,28 @@ function M.highlight(row, side, opts)
     return line_hl, nil
   end
 
+  local inline_hl
+  if side == "old" then
+    inline_hl = "ReviewDiffDeleteIntra"
+  else
+    inline_hl = "ReviewDiffAddIntra"
+  end
+
   local prefix_width = M.source_prefix_width(row, side, opts)
   if side == "old" then
-    return line_hl, { start = prefix_width + range.old_start, finish = prefix_width + range.old_end }
+    return line_hl,
+      {
+        start = prefix_width + range.old_start,
+        finish = prefix_width + range.old_end,
+        hl_group = inline_hl,
+      }
   end
-  return line_hl, { start = prefix_width + range.new_start, finish = prefix_width + range.new_end }
+  return line_hl,
+    {
+      start = prefix_width + range.new_start,
+      finish = prefix_width + range.new_end,
+      hl_group = inline_hl,
+    }
 end
 
 return M

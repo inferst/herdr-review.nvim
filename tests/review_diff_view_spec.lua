@@ -57,30 +57,31 @@ describe("review diff view", function()
     local new_changed_line_details
     local new_inline_details
     for _, mark in ipairs(new_marks) do
-      if mark[2] == 2 and mark[4].line_hl_group == "ReviewDiffAdd" then
+      if mark[2] == 2 and mark[4].hl_group == "ReviewDiffAdd" then
         new_changed_line_details = mark[4]
-      elseif mark[2] == 2 and mark[4].hl_group == "ReviewDiffText" then
+      elseif mark[2] == 2 and mark[4].hl_group == "ReviewDiffAddIntra" then
         new_inline_details = mark[4]
       end
     end
 
     assert.is_truthy(new_changed_line_details)
-    assert.are.same("ReviewDiffAdd", new_changed_line_details.line_hl_group)
+    assert.are.same("ReviewDiffAdd", new_changed_line_details.hl_group)
+    assert.is_true(new_changed_line_details.hl_eol)
     assert.is_truthy(new_inline_details)
-    assert.is_truthy(new_inline_details.virt_text)
     assert.is_true(new_changed_line_details.priority < new_inline_details.priority)
 
     local old_marks = vim.api.nvim_buf_get_extmarks(view.old_buf, render_ns, 0, -1, { details = true })
     local old_changed_line_details
     for _, mark in ipairs(old_marks) do
-      if mark[2] == 2 and mark[4].line_hl_group == "ReviewDiffDelete" then
+      if mark[2] == 2 and mark[4].hl_group == "ReviewDiffDelete" then
         old_changed_line_details = mark[4]
         break
       end
     end
 
     assert.is_truthy(old_changed_line_details)
-    assert.are.same("ReviewDiffDelete", old_changed_line_details.line_hl_group)
+    assert.are.same("ReviewDiffDelete", old_changed_line_details.hl_group)
+    assert.is_true(old_changed_line_details.hl_eol)
 
     local cursorline_marks = vim.api.nvim_buf_get_extmarks(view.new_buf, cursorline_ns, 0, -1, { details = true })
     assert.are.same(1, #cursorline_marks)
@@ -108,20 +109,19 @@ describe("review diff view", function()
     local marks = vim.api.nvim_buf_get_extmarks(view.new_buf, render_ns, 0, -1, { details = true })
     local inline_details
     for _, mark in ipairs(marks) do
-      if mark[2] == 2 and mark[4].hl_group == "ReviewDiffText" then
+      if mark[2] == 2 and mark[4].hl_group == "ReviewDiffAddIntra" then
         inline_details = mark[4]
         break
       end
     end
 
     assert.is_truthy(inline_details)
-    assert.is_truthy(inline_details.virt_text)
-    assert.is_true(inline_details.priority > 10000)
+    assert.is_true(inline_details.priority < 10000)
 
     local cursorline_marks = vim.api.nvim_buf_get_extmarks(view.new_buf, cursorline_ns, 0, -1, { details = true })
     assert.are.same(1, #cursorline_marks)
     assert.are.same("CursorLine", cursorline_marks[1][4].line_hl_group)
-    assert.is_true(cursorline_marks[1][4].priority < inline_details.priority)
+    assert.is_true(cursorline_marks[1][4].priority > inline_details.priority)
   end)
 
   it("projects Tree-sitter highlights into the aggregate buffers", function()
@@ -184,7 +184,8 @@ describe("review diff view", function()
         break
       end
     end
-    assert.are.same("ReviewDiffChange", placeholder_details.line_hl_group)
+    assert.are.same("ReviewDiffChange", placeholder_details.hl_group)
+    assert.is_true(placeholder_details.hl_eol)
 
     assert.are.equal("    1 │ one", vim.api.nvim_buf_get_lines(view.new_buf, 1, 2, false)[1])
     assert.is_nil(view:resolve_location({ file = "lua/added.lua", side = "old", line = 1 }))
