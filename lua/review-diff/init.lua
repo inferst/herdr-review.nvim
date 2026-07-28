@@ -998,6 +998,15 @@ local function setup_autocmds(view)
       end
     end,
   })
+  vim.api.nvim_create_autocmd("VimResized", {
+    group = group,
+    callback = function()
+      if not view.closed and not view.rendering and vim.api.nvim_get_current_tabpage() == view.tabpage then
+        vim.cmd("wincmd =")
+        view:render()
+      end
+    end,
+  })
 end
 
 local function open_tab(view)
