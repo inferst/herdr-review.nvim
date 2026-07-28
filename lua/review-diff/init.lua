@@ -1190,6 +1190,7 @@ function View:open_source_at_cursor()
 end
 
 function View:replace(input, opts)
+  render.clear_text_cache()
   local snapshot = opts and opts.state or self:capture_state()
   local same_review = snapshot and snapshot.review_id == input.review_id
   self.input = vim.deepcopy(input)
@@ -1334,6 +1335,7 @@ local function setup_autocmds(view)
     group = group,
     callback = function()
       if not view.closed and not view.rendering and vim.api.nvim_get_current_tabpage() == view.tabpage then
+        render.clear_text_cache()
         view:render()
       end
     end,

@@ -2,6 +2,12 @@ local model = require("review-diff.model")
 
 local M = {}
 
+M._text_cache = {}
+
+function M.clear_text_cache()
+  M._text_cache = {}
+end
+
 local function wrap_text(text, max_width)
   if max_width < 1 or not text or text == "" then
     return { "" }
@@ -183,40 +189,73 @@ function M.text(row, side, width, opts)
   if row.display_kind == "empty" then
     return "  " .. row.text
   end
+
+  local cache_key
+  if width then
+    local parts =
+      { row.display_kind, tostring(row.file_id), side, tostring(width), tostring(opts and opts.line_numbers) }
+    if row.display_kind == "line" and row.source_row then
+      local s = row.source_row
+      parts[#parts + 1] = tostring(s.old_line)
+      parts[#parts + 1] = tostring(s.new_line)
+      parts[#parts + 1] = s.old_text or "\0nil"
+      parts[#parts + 1] = s.new_text or "\0nil"
+    elseif row.display_kind == "file_header" then
+      parts[#parts + 1] = tostring(row.collapsed)
+    elseif row.display_kind == "fold" then
+      parts[#parts + 1] = tostring(row.fold.first_row)
+      parts[#parts + 1] = tostring(row.fold.last_row)
+    elseif row.display_kind == "metadata" then
+      parts[#parts + 1] = row.text or ""
+    end
+    cache_key = table.concat(parts, "\0")
+    local cached = M._text_cache[cache_key]
+    if cached then
+      return cached
+    end
+  end
+
+  local result
   if row.display_kind == "file_header" then
     local marker = row.collapsed and "▶" or "▼"
     local status = STATUS_LABELS[row.file.status] or "M"
-    return string.format("%s %s %s", marker, status, path_label(row.file, side))
-  end
-  if row.display_kind == "metadata" then
-    return "  " .. row.text
-  end
-  if row.display_kind == "fold" then
-    return string.format("  ⋯ %d unchanged lines ⋯", row.fold.count)
+    result = string.format("%s %s %s", marker, status, path_label(row.file, side))
+  elseif row.display_kind == "metadata" then
+    result = "  " .. row.text
+  elseif row.display_kind == "fold" then
+    result = string.format("  ⋯ %d unchanged lines ⋯", row.fold.count)
+  else
+    local source_row = row.source_row
+    local line
+    local text
+    if side == "old" then
+      line = source_row.old_line
+      text = source_row.old_text
+    else
+      line = source_row.new_line
+      text = source_row.new_text
+    end
+    if opts and opts.line_numbers == false then
+      if not line and width then
+        result = ""
+      else
+        result = text or ""
+      end
+    else
+      local prefix = line and string.format("%5d │ ", line) or "      │ "
+      if not line and width then
+        local remaining = math.max(0, width - vim.fn.strdisplaywidth(prefix))
+        result = prefix .. string.rep(" ", remaining)
+      else
+        result = prefix .. (text or "")
+      end
+    end
   end
 
-  local source_row = row.source_row
-  local line
-  local text
-  if side == "old" then
-    line = source_row.old_line
-    text = source_row.old_text
-  else
-    line = source_row.new_line
-    text = source_row.new_text
+  if cache_key then
+    M._text_cache[cache_key] = result
   end
-  if opts and opts.line_numbers == false then
-    if not line and width then
-      return ""
-    end
-    return text or ""
-  end
-  local prefix = line and string.format("%5d │ ", line) or "      │ "
-  if not line and width then
-    local remaining = math.max(0, width - vim.fn.strdisplaywidth(prefix))
-    return prefix .. string.rep(" ", remaining)
-  end
-  return prefix .. (text or "")
+  return result
 end
 
 ---@param row table
