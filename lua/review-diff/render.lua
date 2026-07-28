@@ -299,4 +299,35 @@ function M.highlight(row, side, opts)
     }
 end
 
+---@param hint_text string
+---@param width integer
+---@return string[]
+function M.wrap_hint_text(hint_text, width)
+  if not hint_text or hint_text == "" then
+    return {}
+  end
+  local parts = vim.split(hint_text, " | ", { plain = true })
+  if #parts == 0 then
+    return {}
+  end
+  local prefix = parts[1]
+  local segments = {}
+  for i = 2, #parts do
+    segments[#segments + 1] = parts[i]
+  end
+  local lines = {}
+  local current = prefix
+  for _, seg in ipairs(segments) do
+    local candidate = current .. " | " .. seg
+    if vim.fn.strdisplaywidth(candidate) <= width then
+      current = candidate
+    else
+      lines[#lines + 1] = current
+      current = "  " .. seg
+    end
+  end
+  lines[#lines + 1] = current
+  return lines
+end
+
 return M

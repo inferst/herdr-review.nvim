@@ -414,8 +414,12 @@ end
 function View:render()
   self.display_rows = render.display_rows(self.files, self.state)
   if self.hint_text then
-    table.insert(self.display_rows, 1, { display_kind = "hint", hint_text = self.hint_text })
-    table.insert(self.display_rows, 2, { display_kind = "hint", hint_text = "" })
+    local width = vim.api.nvim_win_get_width(self.old_win)
+    local hint_lines = render.wrap_hint_text(self.hint_text, width)
+    for i = #hint_lines, 1, -1 do
+      table.insert(self.display_rows, 1, { display_kind = "hint", hint_text = hint_lines[i] })
+    end
+    table.insert(self.display_rows, #hint_lines + 1, { display_kind = "hint", hint_text = "" })
   end
   self.rendering = true
   for _, side in ipairs({ "old", "new" }) do
