@@ -10,6 +10,7 @@ local state = {
   current_view = nil,
   stale_ids = {},
   resolved_locations = {},
+  diff_buffers = {},
 }
 
 local function report_storage_error(message)
@@ -107,6 +108,13 @@ function M.load_session(range, view)
   state.current_range = range
   state.current_view = view or viewer.current()
   if state.current_view then
+    state.diff_buffers = {}
+    for _, side in ipairs({ "old", "new" }) do
+      local bufnr = state.current_view[side .. "_buf"]
+      if bufnr then
+        table.insert(state.diff_buffers, bufnr)
+      end
+    end
     apply_comments(state.current_view, comments, range)
   end
   return true
@@ -163,11 +171,12 @@ function M.reset()
   state.stale_ids = {}
   state.resolved_locations = {}
   pending_view_state = nil
-  for _, bufnr in ipairs(vim.api.nvim_list_bufs()) do
-    if vim.api.nvim_buf_is_loaded(bufnr) then
+  for _, bufnr in ipairs(state.diff_buffers or {}) do
+    if vim.api.nvim_buf_is_valid(bufnr) then
       M.clear_extmarks(bufnr)
     end
   end
+  state.diff_buffers = {}
 end
 
 function M.on_view_closed(view)
