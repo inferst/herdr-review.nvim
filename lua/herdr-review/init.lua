@@ -43,7 +43,7 @@ local function attach_view(view)
     session.on_view_closed(v)
   end)
   view:on("refresh_requested", function(current_view)
-    session.capture_view_state(current_view)
+    local saved_state = current_view:capture_state()
     local current_spec = current_view:get_spec()
     generation = generation + 1
     local refresh_generation = generation
@@ -57,7 +57,7 @@ local function attach_view(view)
     }, {
       on_ready = function(input)
         if refresh_generation == generation and not current_view.closed then
-          current_view:replace(input)
+          current_view:replace(input, { state = saved_state })
         end
       end,
       on_error = function(message)
@@ -124,6 +124,7 @@ local function start_review(spec)
   end
 
   local view = viewer.current()
+  local saved_state
   local created_loading_view = false
   if not view then
     created_loading_view = true
@@ -138,6 +139,7 @@ local function start_review(spec)
     }, setup_options)
     attach_view(view)
   else
+    saved_state = view:capture_state()
     attach_view(view)
     if vim.api.nvim_get_current_tabpage() ~= view.tabpage then
       view:set_origin(vim.api.nvim_get_current_win())
@@ -155,7 +157,7 @@ local function start_review(spec)
       if request_generation ~= generation or view.closed then
         return
       end
-      view:replace(input)
+      view:replace(input, { state = saved_state })
       active_job = nil
     end,
     on_error = function(message)
