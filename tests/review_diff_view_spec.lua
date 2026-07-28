@@ -271,6 +271,121 @@ describe("review diff view", function()
     )
   end)
 
+  it("moves by hunk instead of changed line", function()
+    view = viewer.open({
+      repo_root = vim.fn.getcwd(),
+      review_id = "review-hunk-move",
+      spec = { old = { kind = "ref", name = "HEAD" }, new = { kind = "worktree" } },
+      files = {
+        {
+          id = "lua/example.lua",
+          old_path = "lua/example.lua",
+          new_path = "lua/example.lua",
+          old_text = "one\nold a\nold b\nfour\nfive\nsix",
+          new_text = "one\nnew a\nnew b\nfour\nchanged five\nsix",
+          status = "modified",
+        },
+      },
+    }, { syntax = false })
+
+    vim.api.nvim_set_current_win(view.new_win)
+    assert.are.same({ file = "lua/example.lua", side = "new", line = 2 }, view:get_cursor_location())
+
+    view:move_hunk(1)
+
+    assert.are.same({ file = "lua/example.lua", side = "new", line = 5 }, view:get_cursor_location())
+  end)
+
+  it("wraps hunk navigation at the first and last hunk", function()
+    view = viewer.open({
+      repo_root = vim.fn.getcwd(),
+      review_id = "review-hunk-wrap",
+      spec = { old = { kind = "ref", name = "HEAD" }, new = { kind = "worktree" } },
+      files = {
+        {
+          id = "lua/example.lua",
+          old_path = "lua/example.lua",
+          new_path = "lua/example.lua",
+          old_text = "one\nold a\nold b\nfour\nfive\nsix",
+          new_text = "one\nnew a\nnew b\nfour\nchanged five\nsix",
+          status = "modified",
+        },
+      },
+    }, { syntax = false })
+
+    vim.api.nvim_set_current_win(view.new_win)
+    assert.are.same({ file = "lua/example.lua", side = "new", line = 2 }, view:get_cursor_location())
+
+    view:move_hunk(-1)
+    assert.are.same({ file = "lua/example.lua", side = "new", line = 5 }, view:get_cursor_location())
+
+    view:move_hunk(1)
+    assert.are.same({ file = "lua/example.lua", side = "new", line = 2 }, view:get_cursor_location())
+  end)
+
+  it("opens the target file when hunk navigation lands in a collapsed file", function()
+    view = viewer.open({
+      repo_root = vim.fn.getcwd(),
+      review_id = "review-hunk-collapsed-file",
+      spec = { old = { kind = "ref", name = "HEAD" }, new = { kind = "worktree" } },
+      files = {
+        {
+          id = "lua/a.lua",
+          old_path = "lua/a.lua",
+          new_path = "lua/a.lua",
+          old_text = "one\ntwo",
+          new_text = "one\nchanged two",
+          status = "modified",
+        },
+        {
+          id = "lua/b.lua",
+          old_path = "lua/b.lua",
+          new_path = "lua/b.lua",
+          old_text = "alpha\nbeta",
+          new_text = "alpha\nchanged beta",
+          status = "modified",
+        },
+      },
+    }, { collapse_on_open = true, syntax = false })
+
+    vim.api.nvim_set_current_win(view.new_win)
+    vim.api.nvim_win_set_cursor(view.new_win, { 2, 0 })
+
+    assert.is_true(view.state.collapsed_files["lua/a.lua"])
+    assert.is_true(view.state.collapsed_files["lua/b.lua"])
+
+    view:move_hunk(1)
+
+    assert.is_true(view.state.collapsed_files["lua/a.lua"])
+    assert.is_false(view.state.collapsed_files["lua/b.lua"])
+    assert.are.same({ file = "lua/b.lua", side = "new", line = 2 }, view:get_cursor_location())
+  end)
+
+  it("preserves the active diff side when moving between hunks", function()
+    view = viewer.open({
+      repo_root = vim.fn.getcwd(),
+      review_id = "review-hunk-side",
+      spec = { old = { kind = "ref", name = "HEAD" }, new = { kind = "worktree" } },
+      files = {
+        {
+          id = "lua/example.lua",
+          old_path = "lua/example.lua",
+          new_path = "lua/example.lua",
+          old_text = "one\nold a\nold b\nfour\nfive\nsix",
+          new_text = "one\nnew a\nnew b\nfour\nchanged five\nsix",
+          status = "modified",
+        },
+      },
+    }, { syntax = false })
+
+    vim.api.nvim_set_current_win(view.old_win)
+
+    view:move_hunk(1)
+
+    assert.are.equal(view.old_win, vim.api.nvim_get_current_win())
+    assert.are.same({ file = "lua/example.lua", side = "old", line = 5 }, view:get_cursor_location())
+  end)
+
   it("invalidates itself when the review tab is closed externally", function()
     view = viewer.open({
       repo_root = vim.fn.getcwd(),

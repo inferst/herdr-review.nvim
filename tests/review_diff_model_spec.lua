@@ -29,6 +29,77 @@ describe("review diff model", function()
     }, file.rows)
   end)
 
+  it("records one hunk for a multi-line contiguous change", function()
+    local file = model.build_file({
+      old_path = "lua/example.lua",
+      new_path = "lua/example.lua",
+      old_text = "one\nold a\nold b\nfour",
+      new_text = "one\nnew a\nnew b\nfour",
+      status = "modified",
+    })
+
+    assert.are.same({
+      {
+        id = 1,
+        first_row = 2,
+        last_row = 3,
+        old_start = 2,
+        old_end = 3,
+        new_start = 2,
+        new_end = 3,
+      },
+    }, file.hunks)
+  end)
+
+  it("records separate hunks for separate changed ranges", function()
+    local file = model.build_file({
+      old_path = "lua/example.lua",
+      new_path = "lua/example.lua",
+      old_text = "one\ntwo\nthree\nfour",
+      new_text = "one\nthree\ninserted\nfour",
+      status = "modified",
+    })
+
+    assert.are.same({
+      {
+        id = 1,
+        first_row = 2,
+        last_row = 2,
+        old_start = 2,
+        old_end = 2,
+        new_start = nil,
+        new_end = nil,
+      },
+      {
+        id = 2,
+        first_row = 4,
+        last_row = 4,
+        old_start = nil,
+        old_end = nil,
+        new_start = 3,
+        new_end = 3,
+      },
+    }, file.hunks)
+  end)
+
+  it("keeps binary and too-large files out of hunk navigation", function()
+    local binary = model.build_file({
+      old_path = "bin/example",
+      new_path = "bin/example",
+      binary = true,
+      status = "binary",
+    })
+    local too_large = model.build_file({
+      old_path = "lua/large.lua",
+      new_path = "lua/large.lua",
+      too_large = true,
+      status = "modified",
+    })
+
+    assert.are.same({}, binary.hunks)
+    assert.are.same({}, too_large.hunks)
+  end)
+
   it("collapses unchanged ranges outside the configured context", function()
     local file = model.build_file({
       old_path = "lua/example.lua",
