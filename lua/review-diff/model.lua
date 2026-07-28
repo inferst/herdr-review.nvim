@@ -166,6 +166,10 @@ function M.build_file(file, opts)
   end
 
   append_context_rows(result.rows, old_lines, new_lines, old_cursor, new_cursor, #old_lines + 1, #new_lines + 1)
+
+  for index, source_row in ipairs(result.rows) do
+    source_row._source_index = index
+  end
   return result
 end
 

@@ -461,6 +461,35 @@ function View:render()
     end
   end
   self.rendering = false
+
+  self._row_index = { by_location = {}, by_file_header = {}, by_file_range = {} }
+  for index, row in ipairs(self.display_rows) do
+    if row.display_kind == "line" and row.file_id and row.source_row then
+      local by_file = self._row_index.by_location[row.file_id]
+      if not by_file then
+        by_file = {}
+        self._row_index.by_location[row.file_id] = by_file
+      end
+      for _, side in ipairs({ "old", "new" }) do
+        local line = row.source_row[side .. "_line"]
+        if line then
+          by_file[side .. "_" .. line] = index
+        end
+      end
+    elseif row.display_kind == "file_header" and row.file_id then
+      self._row_index.by_file_header[row.file_id] = index
+    end
+    if row.file_id then
+      local range = self._row_index.by_file_range[row.file_id]
+      if not range then
+        range = { first = index, last = index }
+        self._row_index.by_file_range[row.file_id] = range
+      else
+        range.last = index
+      end
+    end
+  end
+
   self:apply_syntax()
   self:apply_annotations()
   self:update_cursorline()
@@ -581,18 +610,25 @@ function View:location_row(location)
   if not file then
     return nil, nil
   end
-  local side_line = location.side .. "_line"
-  for index, row in ipairs(self.display_rows) do
-    if
-      row.display_kind == "line"
-      and row.file_id == file.id
-      and location.line
-      and row.source_row[side_line] == location.line
-    then
-      return index, row
-    end
+  local by_file = self._row_index and self._row_index.by_location and self._row_index.by_location[file.id]
+  if not by_file then
+    return nil, nil
   end
-  return nil, nil
+  local key = location.side .. "_" .. location.line
+  local index = by_file[key]
+  if not index then
+    return nil, nil
+  end
+  return index, self.display_rows[index]
+end
+
+---@param file_id string
+---@return table|nil
+function View:_file_row_range(file_id)
+  if self._row_index and self._row_index.by_file_range then
+    return self._row_index.by_file_range[file_id]
+  end
+  return nil
 end
 
 function View:expand_source_row(file, source_index)
@@ -872,15 +908,10 @@ local function move_to_rows(view, predicate, direction)
 end
 
 local function source_index_for_display_row(row)
-  if not row or row.display_kind ~= "line" or not row.file then
+  if not row or row.display_kind ~= "line" or not row.source_row then
     return nil
   end
-  for index, source_row in ipairs(row.file.rows or {}) do
-    if source_row == row.source_row then
-      return index
-    end
-  end
-  return nil
+  return row.source_row._source_index
 end
 
 local function collect_hunk_targets(view)
@@ -917,8 +948,25 @@ local function current_hunk_target_index(view, targets)
 end
 
 local function display_row_for_source_index(view, file, source_index)
+  local source_row = file.rows[source_index]
+  if not source_row then
+    return nil
+  end
+  local by_file = view._row_index and view._row_index.by_location and view._row_index.by_location[file.id]
+  if by_file then
+    for _, side in ipairs({ "new", "old" }) do
+      local line = source_row[side .. "_line"]
+      if line then
+        local index = by_file[side .. "_" .. line]
+        if index then
+          return index
+        end
+      end
+    end
+    return nil
+  end
   for index, row in ipairs(view.display_rows) do
-    if row.display_kind == "line" and row.file == file and row.source_row == file.rows[source_index] then
+    if row.display_kind == "line" and row.file == file and row.source_row == source_row then
       return index
     end
   end
@@ -926,6 +974,9 @@ local function display_row_for_source_index(view, file, source_index)
 end
 
 local function file_header_row(view, file)
+  if view._row_index and view._row_index.by_file_header then
+    return view._row_index.by_file_header[file.id]
+  end
   for index, row in ipairs(view.display_rows) do
     if row.display_kind == "file_header" and row.file == file then
       return index

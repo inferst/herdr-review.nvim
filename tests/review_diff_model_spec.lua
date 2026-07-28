@@ -13,6 +13,7 @@ describe("review diff model", function()
 
     assert.are.same({
       {
+        _source_index = 1,
         kind = "context",
         old_line = 1,
         new_line = 1,
@@ -20,6 +21,7 @@ describe("review diff model", function()
         new_text = "one",
       },
       {
+        _source_index = 2,
         kind = "change",
         old_line = 2,
         new_line = 2,
@@ -129,8 +131,8 @@ describe("review diff model", function()
     })
 
     assert.are.same({
-      { kind = "context", old_line = 1, new_line = 1, old_text = "one", new_text = "one" },
-      { kind = "add", old_line = nil, new_line = 2, old_text = nil, new_text = "two" },
+      { _source_index = 1, kind = "context", old_line = 1, new_line = 1, old_text = "one", new_text = "one" },
+      { _source_index = 2, kind = "add", old_line = nil, new_line = 2, old_text = nil, new_text = "two" },
     }, file.rows)
   end)
 
@@ -151,15 +153,15 @@ describe("review diff model", function()
     })
 
     assert.are.same({
-      { kind = "context", old_line = 1, new_line = 1, old_text = "one", new_text = "one" },
-      { kind = "add", old_line = nil, new_line = 2, old_text = nil, new_text = "inserted" },
-      { kind = "context", old_line = 2, new_line = 3, old_text = "two", new_text = "two" },
-      { kind = "context", old_line = 3, new_line = 4, old_text = "three", new_text = "three" },
+      { _source_index = 1, kind = "context", old_line = 1, new_line = 1, old_text = "one", new_text = "one" },
+      { _source_index = 2, kind = "add", old_line = nil, new_line = 2, old_text = nil, new_text = "inserted" },
+      { _source_index = 3, kind = "context", old_line = 2, new_line = 3, old_text = "two", new_text = "two" },
+      { _source_index = 4, kind = "context", old_line = 3, new_line = 4, old_text = "three", new_text = "three" },
     }, inserted.rows)
     assert.are.same({
-      { kind = "context", old_line = 1, new_line = 1, old_text = "one", new_text = "one" },
-      { kind = "delete", old_line = 2, new_line = nil, old_text = "two", new_text = nil },
-      { kind = "context", old_line = 3, new_line = 2, old_text = "three", new_text = "three" },
+      { _source_index = 1, kind = "context", old_line = 1, new_line = 1, old_text = "one", new_text = "one" },
+      { _source_index = 2, kind = "delete", old_line = 2, new_line = nil, old_text = "two", new_text = nil },
+      { _source_index = 3, kind = "context", old_line = 3, new_line = 2, old_text = "three", new_text = "three" },
     }, deleted.rows)
   end)
 
@@ -173,11 +175,11 @@ describe("review diff model", function()
     })
 
     assert.are.same({
-      { kind = "context", old_line = 1, new_line = 1, old_text = "one", new_text = "one" },
-      { kind = "delete", old_line = 2, new_line = nil, old_text = "two", new_text = nil },
-      { kind = "context", old_line = 3, new_line = 2, old_text = "three", new_text = "three" },
-      { kind = "add", old_line = nil, new_line = 3, old_text = nil, new_text = "inserted" },
-      { kind = "context", old_line = 4, new_line = 4, old_text = "four", new_text = "four" },
+      { _source_index = 1, kind = "context", old_line = 1, new_line = 1, old_text = "one", new_text = "one" },
+      { _source_index = 2, kind = "delete", old_line = 2, new_line = nil, old_text = "two", new_text = nil },
+      { _source_index = 3, kind = "context", old_line = 3, new_line = 2, old_text = "three", new_text = "three" },
+      { _source_index = 4, kind = "add", old_line = nil, new_line = 3, old_text = nil, new_text = "inserted" },
+      { _source_index = 5, kind = "context", old_line = 4, new_line = 4, old_text = "four", new_text = "four" },
     }, file.rows)
   end)
 
