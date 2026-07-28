@@ -449,12 +449,29 @@ function View:location_row(location)
   return nil, nil
 end
 
+function View:expand_source_row(file, source_index)
+  if not file then
+    return false
+  end
+  self.state.collapsed_files[file.id] = false
+  if not source_index then
+    return true
+  end
+  for _, row in ipairs(model.visible_rows(file, self.state.context_lines)) do
+    if row.kind == "fold" and source_index >= row.first_row and source_index <= row.last_row then
+      local key = string.format("%s:%d:%d", file.id, row.first_row, row.last_row)
+      self.state.expanded_folds[key] = true
+      break
+    end
+  end
+  return true
+end
+
 function View:expand_location(location)
   local file = file_for_location(self.files, location)
   if not file then
     return nil
   end
-  self.state.collapsed_files[file.id] = false
   local side_line = location.side .. "_line"
   local source_index
   for index, row in ipairs(file.rows) do
@@ -463,15 +480,7 @@ function View:expand_location(location)
       break
     end
   end
-  if not source_index then
-    return file
-  end
-  for _, row in ipairs(model.visible_rows(file, self.state.context_lines)) do
-    if row.kind == "fold" and source_index >= row.first_row and source_index <= row.last_row then
-      local key = string.format("%s:%d:%d", file.id, row.first_row, row.last_row)
-      self.state.expanded_folds[key] = true
-    end
-  end
+  self:expand_source_row(file, source_index)
   return file
 end
 
@@ -728,6 +737,71 @@ local function move_to_rows(view, predicate, direction)
   end
 end
 
+local function source_index_for_display_row(row)
+  if not row or row.display_kind ~= "line" or not row.file then
+    return nil
+  end
+  for index, source_row in ipairs(row.file.rows or {}) do
+    if source_row == row.source_row then
+      return index
+    end
+  end
+  return nil
+end
+
+local function collect_hunk_targets(view)
+  local targets = {}
+  for _, file in ipairs(view.files) do
+    for _, hunk in ipairs(file.hunks or {}) do
+      table.insert(targets, {
+        file = file,
+        hunk = hunk,
+        source_index = hunk.first_row,
+      })
+    end
+  end
+  return targets
+end
+
+local function hunk_contains_source_index(hunk, source_index)
+  return source_index and source_index >= hunk.first_row and source_index <= hunk.last_row
+end
+
+local function current_hunk_target_index(view, targets)
+  local cursor = vim.api.nvim_win_get_cursor(vim.api.nvim_get_current_win())
+  local row = view.display_rows[cursor[1]]
+  local source_index = source_index_for_display_row(row)
+  if not source_index then
+    return nil
+  end
+  for index, target in ipairs(targets) do
+    if target.file == row.file and hunk_contains_source_index(target.hunk, source_index) then
+      return index
+    end
+  end
+  return nil
+end
+
+local function next_hunk_target_index(view, targets, direction)
+  local current_index = current_hunk_target_index(view, targets)
+  if current_index then
+    if direction > 0 then
+      return current_index == #targets and 1 or current_index + 1
+    end
+    return current_index == 1 and #targets or current_index - 1
+  end
+  return direction > 0 and 1 or #targets
+end
+
+local function display_row_for_source_index(view, file, source_index)
+  for index, row in ipairs(view.display_rows) do
+    if row.display_kind == "line" and row.file == file and row.source_row == file.rows[source_index] then
+      return index
+    end
+  end
+  return nil
+end
+
 function View:move_file(direction)
   move_to_rows(self, function(row)
     return row.display_kind == "file_header"
@@ -735,9 +809,23 @@ function View:move_file(direction)
 end
 
 function View:move_hunk(direction)
-  move_to_rows(self, function(row)
-    return row.display_kind == "line" and row.source_row.kind ~= "context"
-  end, direction)
+  local targets = collect_hunk_targets(self)
+  if #targets == 0 then
+    return
+  end
+
+  local target = targets[next_hunk_target_index(self, targets, direction)]
+  if not target then
+    return
+  end
+
+  self:expand_source_row(target.file, target.source_index)
+  self:render()
+
+  local row_index = display_row_for_source_index(self, target.file, target.source_index)
+  if row_index then
+    self:set_cursor_row(row_index)
+  end
 end
 
 function View:sync_cursor()
