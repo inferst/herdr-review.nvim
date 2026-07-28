@@ -1062,10 +1062,18 @@ function View:move_hunk(direction)
     return
   end
 
+  local row_index = display_row_for_source_index(self, target.file, target.source_index)
+  if row_index then
+    if side and valid_window(self[side .. "_win"]) then
+      vim.api.nvim_set_current_win(self[side .. "_win"])
+    end
+    self:set_cursor_row(row_index)
+    return
+  end
+
   self:expand_source_row(target.file, target.source_index)
   self:render()
-
-  local row_index = display_row_for_source_index(self, target.file, target.source_index)
+  row_index = display_row_for_source_index(self, target.file, target.source_index)
   if row_index then
     if side and valid_window(self[side .. "_win"]) then
       vim.api.nvim_set_current_win(self[side .. "_win"])
