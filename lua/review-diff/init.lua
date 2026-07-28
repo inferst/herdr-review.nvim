@@ -822,10 +822,7 @@ end
 
 local function cursor_on_collapsed_file_header(view, cursor_row, target)
   local row = view.display_rows[cursor_row]
-  return row
-    and row.display_kind == "file_header"
-    and row.file == target.file
-    and row.collapsed == true
+  return row and row.display_kind == "file_header" and row.file == target.file and row.collapsed == true
 end
 
 local function next_hunk_target_index(view, targets, direction)

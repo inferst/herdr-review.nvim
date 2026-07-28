@@ -58,7 +58,7 @@ Remote refs are resolved locally. The command does not fetch automatically.
 | `<Tab>` | Collapse/expand the file group under the cursor |
 | `<CR>` | Open the new worktree file in the originating tab/window |
 | `]f` / `[f` | Next/previous file |
-| `]c` / `[c` | Next/previous changed line |
+| `]c` / `[c` | Next/previous hunk |
 | `za` | Toggle a context fold |
 | `zR` / `zM` | Expand/collapse everything |
 | `R` | Refresh the Git snapshot |
