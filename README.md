@@ -72,6 +72,7 @@ Old-side and historical new-side `<CR>` targets are intentionally not opened in 
 | Key | Action |
 |-----|--------|
 | `cc` | Add or edit a comment on the current source line |
+| `cd` | Delete a comment on the current source line |
 | `cl` | Open the comment list |
 | `cs` | Send non-stale comments to a herdr agent |
 
@@ -93,6 +94,7 @@ require("herdr-review").setup({
   },
   keymaps = {
     create_comment = "cc",
+    delete_comment = "cd",
     open_list = "cl",
     send_to_agent = "cs",
   },

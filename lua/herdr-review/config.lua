@@ -8,6 +8,7 @@ M.list_width = 80
 
 M.keymaps = {
   create_comment = "cc",
+  delete_comment = "cd",
   open_list = "cl",
   send_to_agent = "cs",
 }
