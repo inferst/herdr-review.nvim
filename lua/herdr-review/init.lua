@@ -88,7 +88,8 @@ local function attach_view(view)
   })
   if config.diff.show_hint then
     local hint_keys = {
-      "?", "<Tab>",
+      "?",
+      "<Tab>",
       config.keymaps.create_comment,
       config.keymaps.open_list,
       config.keymaps.send_to_agent,
