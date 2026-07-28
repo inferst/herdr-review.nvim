@@ -83,6 +83,7 @@ local function set_default_highlights(opts)
   vim.api.nvim_set_hl(0, "ReviewDiffCommentBorder", { link = "Comment", default = true })
   vim.api.nvim_set_hl(0, "ReviewDiffCommentText", { link = "Comment", default = true })
   vim.api.nvim_set_hl(0, "ReviewDiffCommentTitle", { link = "Title", default = true })
+  vim.api.nvim_set_hl(0, "ReviewDiffHint", { link = "Comment", default = true })
 end
 
 local function create_scratch(name)
@@ -270,6 +271,10 @@ end
 
 function View:render()
   self.display_rows = render.display_rows(self.files, self.state)
+  if self.hint_text then
+    table.insert(self.display_rows, 1, { display_kind = "hint", hint_text = self.hint_text })
+    table.insert(self.display_rows, 2, { display_kind = "hint", hint_text = "" })
+  end
   self.rendering = true
   for _, side in ipairs({ "old", "new" }) do
     local bufnr = self[side .. "_buf"]
