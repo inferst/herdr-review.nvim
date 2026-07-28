@@ -125,6 +125,9 @@ local function start_review(spec)
 
   local view = viewer.current()
   local saved_state
+  if not view then
+    saved_state = session.get_pending_view_state()
+  end
   local created_loading_view = false
   if not view then
     created_loading_view = true

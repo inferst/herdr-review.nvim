@@ -190,4 +190,34 @@ describe("review session", function()
     session.on_view_opened(view)
     assert.is_true(view.state.collapsed_files["lua/a.lua"])
   end)
+
+  it("keeps pending state through the loading view", function()
+    view.options.context_lines = 1
+    view.options.collapse_on_open = true
+    view.options.syntax = false
+    view:replace(state_input("session-loading"))
+    view.state.collapsed_files["lua/a.lua"] = false
+    view:render()
+    set_cursor_at_location(view, { file = "lua/a.lua", side = "new", line = 3 })
+    session.on_view_opened(view)
+
+    session.on_view_closed(view)
+    view:close()
+    view = viewer.open({
+      repo_root = vim.fn.getcwd(),
+      review_id = "loading",
+      spec = { old = { kind = "ref", name = "HEAD" }, new = { kind = "worktree" } },
+      files = {},
+    }, { context_lines = 1, collapse_on_open = true, syntax = false })
+    session.on_view_opened(view)
+
+    local pending = session.get_pending_view_state()
+    assert.is_truthy(pending)
+    view:replace(state_input("session-loading"), { state = pending })
+    session.on_view_opened(view)
+
+    assert.is_false(view.state.collapsed_files["lua/a.lua"])
+    vim.api.nvim_set_current_win(view.new_win)
+    assert.are.same({ file = "lua/a.lua", side = "new", line = 3 }, view:get_cursor_location())
+  end)
 end)

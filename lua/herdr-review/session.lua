@@ -122,6 +122,9 @@ function M.on_view_opened(view)
   if not range then
     return
   end
+  if range == "loading" then
+    return
+  end
   if state.current_range and range ~= state.current_range then
     state.current_range = nil
     state.stale_ids = {}
@@ -133,6 +136,11 @@ function M.on_view_opened(view)
   if saved and saved.review_id == range then
     view:restore_state(saved)
   end
+end
+
+---@return table|nil
+function M.get_pending_view_state()
+  return pending_view_state and vim.deepcopy(pending_view_state) or nil
 end
 
 ---@param bufnr integer
