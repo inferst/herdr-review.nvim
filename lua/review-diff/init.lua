@@ -490,10 +490,14 @@ function View:render()
     end
   end
 
-  self:apply_syntax()
   self:apply_annotations()
   self:update_cursorline()
   self:emit("rendered")
+  vim.schedule(function()
+    if not self.closed then
+      self:apply_syntax()
+    end
+  end)
 end
 
 function View:update_cursorline()

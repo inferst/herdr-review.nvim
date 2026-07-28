@@ -142,6 +142,9 @@ describe("review diff view", function()
       },
     })
 
+    vim.wait(200, function()
+      return #vim.api.nvim_buf_get_extmarks(view.new_buf, syntax_ns, 0, -1, {}) > 0
+    end)
     local marks = vim.api.nvim_buf_get_extmarks(view.new_buf, syntax_ns, 0, -1, {})
     if parser_available then
       assert.is_true(#marks > 0)
