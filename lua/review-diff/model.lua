@@ -74,6 +74,32 @@ local function hunk_line_start(start, count)
   return count == 0 and start + 1 or start
 end
 
+local function source_range(start, count)
+  if count == 0 then
+    return nil, nil
+  end
+  return start, start + count - 1
+end
+
+local function hunk_metadata(id, first_row, last_row, hunk)
+  local old_count = hunk[2]
+  local new_count = hunk[4]
+  local old_start_line = hunk_line_start(hunk[1], old_count)
+  local new_start_line = hunk_line_start(hunk[3], new_count)
+  local old_start, old_end = source_range(old_start_line, old_count)
+  local new_start, new_end = source_range(new_start_line, new_count)
+
+  return {
+    id = id,
+    first_row = first_row,
+    last_row = last_row,
+    old_start = old_start,
+    old_end = old_end,
+    new_start = new_start,
+    new_end = new_end,
+  }
+end
+
 local function append_change_rows(rows, old_lines, new_lines, hunk)
   local old_count = hunk[2]
   local new_count = hunk[4]
@@ -113,6 +139,7 @@ function M.build_file(file, opts)
   result.old_lines = old_lines
   result.new_lines = new_lines
   result.rows = {}
+  result.hunks = {}
 
   if result.binary or result.too_large then
     return result
@@ -131,7 +158,11 @@ function M.build_file(file, opts)
     local new_start = hunk_line_start(hunk[3], hunk[4])
     append_context_rows(result.rows, old_lines, new_lines, old_cursor, new_cursor, old_start, new_start)
 
+    local first_row = #result.rows + 1
     old_cursor, new_cursor = append_change_rows(result.rows, old_lines, new_lines, hunk)
+    local last_row = #result.rows
+
+    table.insert(result.hunks, hunk_metadata(#result.hunks + 1, first_row, last_row, hunk))
   end
 
   append_context_rows(result.rows, old_lines, new_lines, old_cursor, new_cursor, #old_lines + 1, #new_lines + 1)
