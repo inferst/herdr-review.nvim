@@ -86,6 +86,41 @@ function M.create_comment()
   end)
 end
 
+function M.delete_comment_at_cursor()
+  local view = diff.get_current_view()
+  local file, side, line = diff.get_cursor_context()
+  if not view or not file or not side or not line then
+    vim.notify("Not on a source line in the review", vim.log.levels.WARN)
+    return
+  end
+
+  local range = session.get_current_range()
+  if not range then
+    vim.notify("No active review session", vim.log.levels.WARN)
+    return
+  end
+
+  file = paths.normalize(file)
+  local stored = load_comments(range)
+  if not stored then
+    return
+  end
+  local existing = comments.find_at(stored, file, side, line)
+  if not existing then
+    vim.notify("No comment on this line", vim.log.levels.INFO)
+    return
+  end
+
+  local _, err = storage.delete_comment(range, existing.id)
+  if err then
+    notify_storage_error(err)
+    return
+  end
+
+  vim.notify("Comment deleted", vim.log.levels.INFO)
+  session.load_session(range)
+end
+
 ---@param range string
 ---@param comment ReviewComment
 ---@param list_win integer

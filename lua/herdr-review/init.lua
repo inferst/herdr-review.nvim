@@ -75,6 +75,12 @@ local function attach_view(view)
     callback = ui.create_comment,
   })
   view:map({
+    key = config.keymaps.delete_comment,
+    action = "Delete comment",
+    desc = "Herdr Review: Delete comment",
+    callback = ui.delete_comment_at_cursor,
+  })
+  view:map({
     key = config.keymaps.open_list,
     action = "Open comment list",
     desc = "Herdr Review: Open comment list",
@@ -91,6 +97,7 @@ local function attach_view(view)
       "?",
       "<Tab>",
       config.keymaps.create_comment,
+      config.keymaps.delete_comment,
       config.keymaps.open_list,
       config.keymaps.send_to_agent,
       "R",
