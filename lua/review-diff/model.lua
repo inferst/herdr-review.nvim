@@ -132,6 +132,8 @@ end
 ---@return table
 function M.build_file(file, opts)
   opts = opts or {}
+  file._visible_rows = nil
+  file._visible_context_lines = nil
   local old_lines = split_lines(file.old_text)
   local new_lines = split_lines(file.new_text)
   local result = vim.deepcopy(file)
@@ -193,6 +195,9 @@ end
 ---@return table[]
 function M.visible_rows(file, context_lines)
   context_lines = context_lines or 3
+  if file._visible_rows and file._visible_context_lines == context_lines then
+    return file._visible_rows
+  end
   local changed = {}
   for index, row in ipairs(file.rows) do
     if row.kind ~= "context" then
@@ -203,6 +208,8 @@ function M.visible_rows(file, context_lines)
   end
 
   if next(changed) == nil then
+    file._visible_rows = file.rows
+    file._visible_context_lines = context_lines
     return file.rows
   end
 
@@ -225,6 +232,8 @@ function M.visible_rows(file, context_lines)
       })
     end
   end
+  file._visible_rows = visible
+  file._visible_context_lines = context_lines
   return visible
 end
 
