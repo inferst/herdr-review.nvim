@@ -782,6 +782,52 @@ local function current_hunk_target_index(view, targets)
   return nil
 end
 
+local function display_row_for_source_index(view, file, source_index)
+  for index, row in ipairs(view.display_rows) do
+    if row.display_kind == "line" and row.file == file and row.source_row == file.rows[source_index] then
+      return index
+    end
+  end
+  return nil
+end
+
+local function file_header_row(view, file)
+  for index, row in ipairs(view.display_rows) do
+    if row.display_kind == "file_header" and row.file == file then
+      return index
+    end
+  end
+  return nil
+end
+
+local function target_anchor_row(view, target)
+  local exact = display_row_for_source_index(view, target.file, target.source_index)
+  if exact then
+    return exact
+  end
+
+  for index, row in ipairs(view.display_rows) do
+    if
+      row.display_kind == "fold"
+      and row.file == target.file
+      and target.source_index >= row.fold.first_row
+      and target.source_index <= row.fold.last_row
+    then
+      return index
+    end
+  end
+
+  return file_header_row(view, target.file)
+end
+
+local function cursor_on_collapsed_file_header(view, cursor_row, target)
+  local row = view.display_rows[cursor_row]
+  return row
+    and row.display_kind == "file_header"
+    and row.file == target.file
+    and row.collapsed == true
+end
+
 local function next_hunk_target_index(view, targets, direction)
   local current_index = current_hunk_target_index(view, targets)
   if current_index then
@@ -790,16 +836,25 @@ local function next_hunk_target_index(view, targets, direction)
     end
     return current_index == 1 and #targets or current_index - 1
   end
-  return direction > 0 and 1 or #targets
-end
 
-local function display_row_for_source_index(view, file, source_index)
-  for index, row in ipairs(view.display_rows) do
-    if row.display_kind == "line" and row.file == file and row.source_row == file.rows[source_index] then
+  local cursor_row = vim.api.nvim_win_get_cursor(vim.api.nvim_get_current_win())[1]
+  if direction > 0 then
+    for index, target in ipairs(targets) do
+      local anchor = target_anchor_row(view, target)
+      if anchor and (anchor > cursor_row or cursor_on_collapsed_file_header(view, cursor_row, target)) then
+        return index
+      end
+    end
+    return 1
+  end
+
+  for index = #targets, 1, -1 do
+    local anchor = target_anchor_row(view, targets[index])
+    if anchor and anchor < cursor_row then
       return index
     end
   end
-  return nil
+  return #targets
 end
 
 function View:move_file(direction)
@@ -814,6 +869,8 @@ function View:move_hunk(direction)
     return
   end
 
+  local current_win = vim.api.nvim_get_current_win()
+  local side = self.win_sides[current_win]
   local target = targets[next_hunk_target_index(self, targets, direction)]
   if not target then
     return
@@ -824,6 +881,9 @@ function View:move_hunk(direction)
 
   local row_index = display_row_for_source_index(self, target.file, target.source_index)
   if row_index then
+    if side and valid_window(self[side .. "_win"]) then
+      vim.api.nvim_set_current_win(self[side .. "_win"])
+    end
     self:set_cursor_row(row_index)
   end
 end
