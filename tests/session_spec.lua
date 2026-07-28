@@ -116,6 +116,10 @@ describe("review session", function()
     })
     assert.is_nil(err)
 
+    local files_ready = false
+    local unsub = view:on("files_ready", function()
+      files_ready = true
+    end)
     view:replace({
       repo_root = vim.fn.getcwd(),
       review_id = "HEAD..WORKTREE",
@@ -131,6 +135,10 @@ describe("review session", function()
         },
       },
     })
+    vim.wait(5000, function()
+      return files_ready
+    end)
+    unsub()
     assert.are.same(
       { file = "lua/init.lua", side = "new", line = 3 },
       view:resolve_location({ file = "lua/init.lua", side = "new", line = 2 }, "one\ntwo\nchanged")
@@ -146,7 +154,15 @@ describe("review session", function()
     view.options.context_lines = 1
     view.options.collapse_on_open = true
     view.options.syntax = false
+    local files_ready = false
+    local unsub = view:on("files_ready", function()
+      files_ready = true
+    end)
     view:replace(state_input("session-state"))
+    vim.wait(5000, function()
+      return files_ready
+    end)
+    unsub()
     view.state.collapsed_files["lua/a.lua"] = false
     view.state.collapsed_files["lua/b.lua"] = true
     view:render()
@@ -172,7 +188,15 @@ describe("review session", function()
     view.options.context_lines = 1
     view.options.collapse_on_open = true
     view.options.syntax = false
+    local files_ready = false
+    local unsub = view:on("files_ready", function()
+      files_ready = true
+    end)
     view:replace(state_input("session-state-old"))
+    vim.wait(5000, function()
+      return files_ready
+    end)
+    unsub()
     view.state.collapsed_files["lua/a.lua"] = false
     view:render()
     set_cursor_at_location(view, { file = "lua/a.lua", side = "new", line = 3 })
@@ -195,7 +219,15 @@ describe("review session", function()
     view.options.context_lines = 1
     view.options.collapse_on_open = true
     view.options.syntax = false
+    local files_ready = false
+    local unsub = view:on("files_ready", function()
+      files_ready = true
+    end)
     view:replace(state_input("session-loading"))
+    vim.wait(5000, function()
+      return files_ready
+    end)
+    unsub()
     view.state.collapsed_files["lua/a.lua"] = false
     view:render()
     set_cursor_at_location(view, { file = "lua/a.lua", side = "new", line = 3 })
@@ -213,7 +245,15 @@ describe("review session", function()
 
     local pending = session.get_pending_view_state()
     assert.is_truthy(pending)
+    local files_ready2 = false
+    local unsub2 = view:on("files_ready", function()
+      files_ready2 = true
+    end)
     view:replace(state_input("session-loading"), { state = pending })
+    vim.wait(5000, function()
+      return files_ready2
+    end)
+    unsub2()
     session.on_view_opened(view)
 
     assert.is_false(view.state.collapsed_files["lua/a.lua"])

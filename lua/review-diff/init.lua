@@ -1344,22 +1344,56 @@ function View:replace(input, opts)
   local snapshot = opts and opts.state or self:capture_state()
   local same_review = snapshot and snapshot.review_id == input.review_id
   self.input = vim.deepcopy(input)
-  self.files = model.build(input.files or {}, self.options).files
+  self.files = {}
   self.syntax_cache = {}
   self.state.context_lines = self.options.context_lines
   self.state.empty_text = input.empty_text or "No changes"
   self.state.collapsed_files = {}
-  for _, file in ipairs(self.files) do
-    local saved = same_review and (snapshot.collapsed_files or {})[file.id] or nil
-    self.state.collapsed_files[file.id] = saved ~= nil and saved or self.options.collapse_on_open
-  end
   self.state.expanded_folds = same_review and vim.deepcopy(snapshot.expanded_folds or {}) or {}
-  self:render()
-  self:place_initial_cursor()
-  self:emit("ready")
-  if same_review then
-    self:restore_state(snapshot)
+
+  self._build_generation = (self._build_generation or 0) + 1
+  local generation = self._build_generation
+
+  local total = #(input.files or {})
+  if total == 0 then
+    self:render()
+    self:emit("ready")
+    self:emit("files_ready")
+    return
   end
+
+  self.hint_text = "Resolving diffs…"
+  self:render()
+  self:emit("ready")
+
+  model.build_async(input.files, self.options, function(file, current, _)
+    if self._build_generation ~= generation then
+      return
+    end
+    table.insert(self.files, file)
+    self.state.collapsed_files[file.id] = self.options.collapse_on_open
+    self.hint_text = string.format("Processing %d/%d… %s", current, total, file.new_path or file.old_path or "")
+    self:render()
+  end, function(result)
+    if self._build_generation ~= generation then
+      return
+    end
+    self.files = result.files
+    for _, file in ipairs(self.files) do
+      if self.state.collapsed_files[file.id] == nil then
+        self.state.collapsed_files[file.id] = self.options.collapse_on_open
+      end
+    end
+    self.hint_text = nil
+    self:render()
+    self:place_initial_cursor()
+    if same_review then
+      self:restore_state(snapshot)
+    end
+    self:emit("files_ready")
+  end, function()
+    return self._build_generation == generation
+  end)
 end
 
 function View:place_initial_cursor()
@@ -1573,6 +1607,7 @@ function M.open(input, opts)
   view:render()
   view:place_initial_cursor()
   view:emit("ready")
+  view:emit("files_ready")
   return view
 end
 

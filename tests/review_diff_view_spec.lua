@@ -510,7 +510,15 @@ describe("review diff view", function()
       current_view.state.collapsed_files["lua/a.lua"] = true
       current_view.state.expanded_folds = {}
     end)
+    local files_ready = false
+    local unsub = view:on("files_ready", function()
+      files_ready = true
+    end)
     view:replace(state_input("review-state-replace"), { state = snapshot })
+    vim.wait(5000, function()
+      return files_ready
+    end)
+    unsub()
     remove_ready()
 
     assert.is_false(view.state.collapsed_files["lua/a.lua"])
@@ -526,7 +534,15 @@ describe("review diff view", function()
     set_cursor_at_location(view, { file = "lua/a.lua", side = "new", line = 3 })
     local snapshot = view:capture_state()
 
+    local files_ready = false
+    local unsub = view:on("files_ready", function()
+      files_ready = true
+    end)
     view:replace(state_input("review-state-new"), { state = snapshot })
+    vim.wait(5000, function()
+      return files_ready
+    end)
+    unsub()
 
     assert.is_true(view.state.collapsed_files["lua/a.lua"])
     assert.is_true(view.state.collapsed_files["lua/b.lua"])

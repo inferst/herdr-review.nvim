@@ -36,7 +36,7 @@ local function attach_view(view)
   end
   view.herdr_review_attached = true
 
-  view:on("ready", function(current_view)
+  view:on("files_ready", function(current_view)
     session.on_view_opened(current_view)
   end)
   view:on("closed", function(v)
@@ -111,7 +111,9 @@ local function attach_view(view)
     end
     view.hint_text = "Hint: " .. table.concat(parts, " | ")
   end
-  session.on_view_opened(view)
+  if view.files and #view.files > 0 then
+    session.on_view_opened(view)
+  end
 end
 
 local function start_review(spec)
