@@ -363,9 +363,18 @@ local function syntax_value(file, side)
   return file.new_path, file.new_text
 end
 
-function View:apply_syntax()
+function View:apply_syntax(changed_file_ids)
   for _, side in ipairs({ "old", "new" }) do
-    vim.api.nvim_buf_clear_namespace(self[side .. "_buf"], syntax_ns, 0, -1)
+    if changed_file_ids then
+      for file_id, _ in pairs(changed_file_ids) do
+        local range = self:_file_row_range(file_id)
+        if range then
+          vim.api.nvim_buf_clear_namespace(self[side .. "_buf"], syntax_ns, range.first - 1, range.last)
+        end
+      end
+    else
+      vim.api.nvim_buf_clear_namespace(self[side .. "_buf"], syntax_ns, 0, -1)
+    end
   end
 
   local syntax_options = self.options.syntax
@@ -376,33 +385,35 @@ function View:apply_syntax()
   for _, side in ipairs({ "old", "new" }) do
     local bufnr = self[side .. "_buf"]
     for _, file in ipairs(self.files) do
-      local path, text = syntax_value(file, side)
-      if path and text and not file.binary and not file.too_large then
-        self.syntax_cache[file.id] = self.syntax_cache[file.id] or {}
-        local cached = self.syntax_cache[file.id][side]
-        if not cached or cached.path ~= path or cached.text ~= text then
-          cached = {
-            path = path,
-            text = text,
-            spans = syntax.collect(path, text, syntax_options),
-          }
-          self.syntax_cache[file.id][side] = cached
-        end
+      if not changed_file_ids or changed_file_ids[file.id] then
+        local path, text = syntax_value(file, side)
+        if path and text and not file.binary and not file.too_large then
+          self.syntax_cache[file.id] = self.syntax_cache[file.id] or {}
+          local cached = self.syntax_cache[file.id][side]
+          if not cached or cached.path ~= path or cached.text ~= text then
+            cached = {
+              path = path,
+              text = text,
+              spans = syntax.collect(path, text, syntax_options),
+            }
+            self.syntax_cache[file.id][side] = cached
+          end
 
-        for _, span in ipairs(cached.spans) do
-          local row_index, row = self:location_row({ file = path, side = side, line = span.line })
-          if row_index then
-            local prefix_width = render.source_prefix_width(row, side, self.options)
-            local start_col = prefix_width + span.start_col
-            local end_col = prefix_width + span.end_col
-            if end_col > start_col then
-              vim.api.nvim_buf_set_extmark(bufnr, syntax_ns, row_index - 1, start_col, {
-                end_row = row_index - 1,
-                end_col = end_col,
-                hl_group = span.hl_group,
-                hl_mode = "combine",
-                priority = span.priority,
-              })
+          for _, span in ipairs(cached.spans) do
+            local row_index, row = self:location_row({ file = path, side = side, line = span.line })
+            if row_index then
+              local prefix_width = render.source_prefix_width(row, side, self.options)
+              local start_col = prefix_width + span.start_col
+              local end_col = prefix_width + span.end_col
+              if end_col > start_col then
+                vim.api.nvim_buf_set_extmark(bufnr, syntax_ns, row_index - 1, start_col, {
+                  end_row = row_index - 1,
+                  end_col = end_col,
+                  hl_group = span.hl_group,
+                  hl_mode = "combine",
+                  priority = span.priority,
+                })
+              end
             end
           end
         end
@@ -863,7 +874,7 @@ function View:_replace_file_rows(file_id)
   local new_rows = self:_build_file_rows(file_id)
   local old_count = file_range.last - file_range.first + 1
 
-  for i = old_count, 1, -1 do
+  for _ = old_count, 1, -1 do
     table.remove(self.display_rows, file_range.first)
   end
   for i, r in ipairs(new_rows) do
@@ -914,6 +925,7 @@ function View:_replace_file_rows(file_id)
   self:_rebuild_row_index()
   self:apply_annotations()
   self:update_cursorline()
+  self:apply_syntax({ [file_id] = true })
   self:emit("rendered")
 end
 
