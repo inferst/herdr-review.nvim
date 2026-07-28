@@ -177,6 +177,9 @@ end
 ---@param opts table|nil
 ---@return string
 function M.text(row, side, width, opts)
+  if row.display_kind == "hint" then
+    return row.hint_text or ""
+  end
   if row.display_kind == "empty" then
     return "  " .. row.text
   end
@@ -221,6 +224,13 @@ end
 ---@param opts table|nil
 ---@return string|nil, table|nil
 function M.highlight(row, side, opts)
+  if row.display_kind == "hint" then
+    local hint_text = row.hint_text or ""
+    if hint_text == "" then
+      return nil, nil
+    end
+    return "ReviewDiffHint", nil
+  end
   if row.display_kind == "file_header" then
     return "ReviewDiffFileHeader", nil
   end
