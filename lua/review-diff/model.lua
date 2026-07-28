@@ -190,6 +190,45 @@ function M.build(files, opts)
   return result
 end
 
+---@param files table[]
+---@param opts table|nil
+---@param on_file fun(file: table, index: integer, total: integer)|nil
+---@param on_done fun(result: table)|nil
+---@param generation_check fun(): boolean|nil
+function M.build_async(files, opts, on_file, on_done, generation_check)
+  opts = opts or {}
+  local result = { files = {} }
+  local i = 0
+  local batch_size = 3
+
+  local function process_batch()
+    if generation_check and not generation_check() then
+      return
+    end
+    local batch_end = math.min(i + batch_size, #files)
+    while i < batch_end do
+      i = i + 1
+      local file = M.build_file(files[i], opts)
+      table.insert(result.files, file)
+      if on_file then
+        on_file(file, i, #files)
+      end
+    end
+    if i < #files then
+      vim.schedule(process_batch)
+    else
+      table.sort(result.files, function(left, right)
+        return path_for_sort(left) < path_for_sort(right)
+      end)
+      if on_done then
+        on_done(result)
+      end
+    end
+  end
+
+  vim.schedule(process_batch)
+end
+
 ---@param file table
 ---@param context_lines integer
 ---@return table[]
