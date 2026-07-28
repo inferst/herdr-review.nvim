@@ -183,6 +183,12 @@ function M.setup(opts)
   }, opts.diff or {})
   viewer.setup(setup_options)
 
+  if opts.diff then
+    for key, value in pairs(opts.diff) do
+      config.diff[key] = value
+    end
+  end
+
   if opts.keymaps then
     for key, value in pairs(opts.keymaps) do
       config.keymaps[key] = value
