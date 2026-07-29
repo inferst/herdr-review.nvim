@@ -9,6 +9,27 @@ describe("review diff view", function()
     end
   end)
 
+  it("opens resolved input through the named public entrypoint", function()
+    view = viewer.open_resolved({
+      repo_root = vim.fn.getcwd(),
+      review_id = "review-open-resolved",
+      spec = { old = { kind = "ref", name = "HEAD" }, new = { kind = "worktree" } },
+      files = {
+        {
+          id = "lua/example.lua",
+          old_path = "lua/example.lua",
+          new_path = "lua/example.lua",
+          old_text = "one\ntwo",
+          new_text = "one\nthree",
+          status = "modified",
+        },
+      },
+    }, { syntax = false })
+
+    assert.are.equal("review-open-resolved", view:id())
+    assert.are.equal("ready", view:status())
+  end)
+
   it("opens aligned unlisted old and new buffers", function()
     view = viewer.open({
       repo_root = vim.fn.getcwd(),
