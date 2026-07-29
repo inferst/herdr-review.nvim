@@ -50,8 +50,8 @@ function M.create_comment()
       return
     end
 
-    local radius = view:get_context_radius()
-    local context_lines = view:get_context({ file = file, side = side, line = line }, radius) or {}
+    local cursor = view:cursor_context({ include_context = true })
+    local context_lines = cursor and cursor.context and cursor.context.lines or {}
     local context = table.concat(context_lines, "\n")
     local context_start = math.max(1, line - radius)
 

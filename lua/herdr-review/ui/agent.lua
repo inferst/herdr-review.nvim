@@ -70,7 +70,7 @@ function M.send_to_agent()
     return
   end
 
-  local project_root = view:get_repo_root()
+  local project_root = view:repo_root()
   if not project_root then
     vim.notify("Cannot determine project root", vim.log.levels.ERROR)
     return

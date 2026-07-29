@@ -328,6 +328,21 @@ function View:cursor_context(opts)
   return result, nil
 end
 
+function View:buffer_context(bufnr)
+  local side
+  if bufnr == self.old_buf then
+    side = "old"
+  elseif bufnr == self.new_buf then
+    side = "new"
+  end
+  if not side then
+    return nil, error_result("not_review_buffer", "Buffer is not part of the review")
+  end
+  local current = self:get_cursor_location()
+  local path = current and current.side == side and current.file or nil
+  return { side = side, file = path and { path = path } or nil, path = path }, nil
+end
+
 function View:resolve_anchor(anchor, opts)
   opts = opts or {}
   local location = {

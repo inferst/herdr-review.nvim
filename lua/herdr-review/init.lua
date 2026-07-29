@@ -102,10 +102,6 @@ local function attach_view(view)
     local hint_keys = {
       "?",
       "<Tab>",
-      config.keymaps.create_comment,
-      config.keymaps.delete_comment,
-      config.keymaps.open_list,
-      config.keymaps.send_to_agent,
       "R",
     }
     local parts = {}
@@ -113,6 +109,18 @@ local function attach_view(view)
       local desc = view.keymaps[key]
       if desc then
         table.insert(parts, key .. " " .. desc)
+      end
+    end
+    local action_labels = view:metadata().actions or {}
+    for _, action_id in ipairs({
+      "herdr.comment.create",
+      "herdr.comment.delete",
+      "herdr.comment.list",
+      "herdr.agent.send",
+    }) do
+      local desc = action_labels[action_id]
+      if desc then
+        table.insert(parts, desc)
       end
     end
     view.hint_text = "Hint: " .. table.concat(parts, " | ")
