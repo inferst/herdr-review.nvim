@@ -6,8 +6,8 @@ local state_module = require("review-diff.state")
 local annotations = require("review-diff.annotations")
 local actions = require("review-diff.actions")
 local navigation = require("review-diff.navigation")
+local incremental = require("review-diff.incremental")
 
-local render_ns = vim.api.nvim_create_namespace("review-diff-render")
 local syntax_ns = vim.api.nvim_create_namespace("review-diff-syntax")
 local cursorline_ns = vim.api.nvim_create_namespace("review-diff-cursorline")
 
@@ -309,48 +309,22 @@ function View:render()
   end
   self.rendering = true
   for _, side in ipairs({ "old", "new" }) do
-    local bufnr = self[side .. "_buf"]
-    local width = vim.api.nvim_win_get_width(self[side .. "_win"])
-    local lines = {}
-    for _, row in ipairs(self.display_rows) do
-      table.insert(lines, render.text(row, side, width, self.options))
-    end
-
-    vim.bo[bufnr].modifiable = true
-    vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, lines)
-    vim.bo[bufnr].modifiable = false
-    vim.api.nvim_buf_clear_namespace(bufnr, render_ns, 0, -1)
-
-    for index, row in ipairs(self.display_rows) do
-      local line_hl, inline = render.highlight(row, side, self.options)
-      if line_hl then
-        local col_start = 0
-        if row.display_kind == "line" then
-          col_start = render.source_prefix_width(row, side, self.options)
-        end
-        vim.api.nvim_buf_set_extmark(bufnr, render_ns, index - 1, col_start, {
-          end_row = index,
-          end_col = 0,
-          hl_group = line_hl,
-          hl_eol = true,
-          priority = 50,
-        })
-      end
-      if inline and inline.finish > inline.start then
-        vim.api.nvim_buf_set_extmark(bufnr, render_ns, index - 1, inline.start, {
-          end_row = index - 1,
-          end_col = inline.finish,
-          hl_group = inline.hl_group,
-          priority = 80,
-        })
-      end
-    end
+    incremental.write_rows(self, side, self.display_rows, 0, -1)
   end
   self.rendering = false
+  incremental.reindex(self)
   self:apply_syntax()
   self:apply_annotations()
   self:update_cursorline()
   self:emit("rendered")
+end
+
+---Re-renders exactly one file in place, leaving every other file's buffer
+---lines and extmarks untouched. Falls back to a full render if this file has
+---no known position yet (e.g. before the first render).
+---@param file table
+function View:render_file(file)
+  incremental.render_file(self, file)
 end
 
 function View:update_cursorline()
@@ -397,21 +371,21 @@ end
 
 function View:location_row(location)
   local file = file_for_location(self.files, location)
-  if not file then
+  if not file or not location.line then
     return nil, nil
   end
-  local side_line = location.side .. "_line"
-  for index, row in ipairs(self.display_rows) do
-    if
-      row.display_kind == "line"
-      and row.file_id == file.id
-      and location.line
-      and row.source_row[side_line] == location.line
-    then
-      return index, row
-    end
+  local file_index = self.row_index and self.row_index[file.id]
+  local side_index = file_index and file_index[location.side]
+  local relative = side_index and side_index[location.line]
+  if not relative then
+    return nil, nil
   end
-  return nil, nil
+  local range = self.file_row_ranges and self.file_row_ranges[file.id]
+  if not range then
+    return nil, nil
+  end
+  local row_index = range.start + relative - 1
+  return row_index, self.display_rows[row_index]
 end
 
 function View:expand_source_row(file, source_index)
@@ -553,7 +527,7 @@ function View:toggle_file_at_cursor()
   end
   local file_id = row.file_id
   self.state.collapsed_files[file_id] = not self.state.collapsed_files[file_id]
-  self:render()
+  self:render_file(row.file)
   if self.state.collapsed_files[file_id] then
     for index, display_row in ipairs(self.display_rows) do
       if display_row.file_id == file_id then
@@ -579,7 +553,7 @@ function View:toggle_fold_at_cursor()
     local key = string.format("%s:%d:%d", file_id, target_first, target_last)
     local was_expanded = self.state.expanded_folds[key]
     self.state.expanded_folds[key] = not was_expanded
-    self:render()
+    self:render_file(row.file)
     if was_expanded then
       for index, display_row in ipairs(self.display_rows) do
         if

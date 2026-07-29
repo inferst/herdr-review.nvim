@@ -53,7 +53,7 @@ function M.create_comment()
     local cursor = view:cursor_context({ include_context = true })
     local context_lines = cursor and cursor.context and cursor.context.lines or {}
     local context = table.concat(context_lines, "\n")
-    local context_start = math.max(1, line - radius)
+    local context_start = cursor and cursor.context and cursor.context.start_line or line
 
     local data
     local err
