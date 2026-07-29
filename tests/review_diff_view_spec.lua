@@ -357,6 +357,56 @@ describe("review diff view", function()
     assert.are.equal(1, #vim.api.nvim_buf_get_extmarks(view.new_buf, view.annotation_ns, 0, -1, {}))
   end)
 
+  it("syncs annotations through anchors and reports moved and stale comments", function()
+    view = viewer.open({
+      repo_root = vim.fn.getcwd(),
+      review_id = "review-sync-annotations",
+      spec = { old = { kind = "ref", name = "HEAD" }, new = { kind = "worktree" } },
+      files = {
+        {
+          id = "lua/example.lua",
+          old_path = "lua/example.lua",
+          new_path = "lua/example.lua",
+          old_text = "one\ntwo\nchanged",
+          new_text = "zero\none\ntwo\nchanged",
+          status = "modified",
+        },
+      },
+    }, { context_lines = 1, syntax = false })
+
+    local result = view:sync_annotations({
+      {
+        id = "comment-1",
+        anchor = {
+          file = "lua/example.lua",
+          side = "new",
+          line = 2,
+          context = "one\ntwo\nchanged",
+        },
+        text = "Review this",
+      },
+      {
+        id = "comment-2",
+        anchor = {
+          file = "lua/example.lua",
+          side = "new",
+          line = 99,
+          context = "missing",
+        },
+        text = "Stale",
+      },
+    })
+
+    assert.are.same({ "comment-1" }, result.applied)
+    assert.are.same({ "comment-2" }, result.stale)
+    assert.are.same({ file = "lua/example.lua", side = "new", line = 3 }, result.resolved["comment-1"])
+    assert.are.same({
+      location = { file = "lua/example.lua", side = "new", line = 3 },
+      context = "one\ntwo\nchanged",
+      context_start = 2,
+    }, result.moved["comment-1"])
+  end)
+
   it("reanchors a location from its saved context", function()
     view = viewer.open({
       repo_root = vim.fn.getcwd(),

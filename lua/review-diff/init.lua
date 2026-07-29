@@ -634,6 +634,74 @@ function View:set_annotations(annotations)
   return self:apply_annotations()
 end
 
+function View:sync_annotations(annotations, opts)
+  opts = opts or {}
+  local resolved_by_id = {}
+  local moved_by_id = {}
+  local stale_by_id = {}
+  local next_annotations = {}
+  local radius = opts.radius or self:get_context_radius()
+
+  for _, annotation in ipairs(annotations or {}) do
+    local id = annotation.id and tostring(annotation.id) or nil
+    local anchor = annotation.anchor or annotation.location
+    if id and anchor then
+      local resolved = self:resolve_anchor(anchor, { radius = radius })
+      if resolved then
+        self:expand_location(resolved)
+        resolved_by_id[id] = resolved
+        if resolved.line ~= anchor.line then
+          local context = self:context(resolved, { radius = radius })
+          moved_by_id[id] = {
+            location = resolved,
+            context = context and context.text or "",
+            context_start = context and context.start_line or resolved.line,
+          }
+        end
+        table.insert(next_annotations, {
+          id = id,
+          location = resolved,
+          text = annotation.text,
+        })
+      else
+        stale_by_id[id] = true
+        table.insert(next_annotations, {
+          id = id,
+          location = {
+            file = anchor.file,
+            side = anchor.side,
+            line = nil,
+          },
+          text = annotation.text,
+        })
+      end
+    end
+  end
+
+  self:render()
+  local applied_result = self:set_annotations(next_annotations)
+  local result = {
+    applied = applied_result.applied,
+    stale = applied_result.stale,
+    resolved = resolved_by_id,
+    moved = moved_by_id,
+  }
+  for id in pairs(stale_by_id) do
+    local already_present = false
+    for _, stale_id in ipairs(result.stale) do
+      if stale_id == id then
+        already_present = true
+        break
+      end
+    end
+    if not already_present then
+      table.insert(result.stale, id)
+    end
+  end
+  table.sort(result.stale)
+  return result
+end
+
 ---@param annotation table
 ---@return table
 function View:set_annotation(annotation)
