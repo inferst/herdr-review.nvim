@@ -204,6 +204,20 @@ local function file_metadata(file)
   }
 end
 
+local function error_result(code, message)
+  return { code = code, message = message }
+end
+
+local function context_result(lines, location, radius)
+  local start_line = math.max(1, location.line - radius)
+  return {
+    lines = lines,
+    text = table.concat(lines, "\n"),
+    start_line = start_line,
+    radius = radius,
+  }
+end
+
 local View = {}
 View.__index = View
 
@@ -250,6 +264,84 @@ end
 ---@return string|nil
 function View:get_repo_root()
   return self.input.repo_root
+end
+
+function View:id()
+  return self:get_review_id()
+end
+
+function View:metadata()
+  return {
+    review_id = self:get_review_id(),
+    label = self.input.label,
+    cwd = self.input.cwd,
+    repo_root = self.input.repo_root,
+    spec = vim.deepcopy(self.input.spec),
+    context_radius = self:get_context_radius(),
+    files = self:get_files(),
+  }
+end
+
+function View:status()
+  if self.closed then
+    return "closed"
+  end
+  if self:get_review_id() == "loading" then
+    return "loading"
+  end
+  local empty_text = self.state and self.state.empty_text or ""
+  if type(empty_text) == "string" and empty_text:sub(1, #"Git error:") == "Git error:" then
+    return "error"
+  end
+  return "ready"
+end
+
+function View:repo_root()
+  return self:get_repo_root()
+end
+
+function View:context(location, opts)
+  opts = opts or {}
+  local radius = opts.radius or self:get_context_radius()
+  local lines, err = self:get_context(location, radius)
+  if not lines then
+    return nil, error_result(err == "file not found" and "file_not_found" or "stale_location", err)
+  end
+  return context_result(lines, location, radius), nil
+end
+
+function View:cursor_context(opts)
+  opts = opts or {}
+  local location = self:get_cursor_location()
+  if not location then
+    return nil, error_result("not_on_source_line", "Not on a source line in the review")
+  end
+  local result = { location = location }
+  if opts.include_context then
+    local context, err = self:context(location, { radius = opts.radius })
+    if not context then
+      return nil, err
+    end
+    result.context = context
+  end
+  return result, nil
+end
+
+function View:resolve_anchor(anchor, opts)
+  opts = opts or {}
+  local location = {
+    file = anchor and anchor.file,
+    side = anchor and anchor.side,
+    line = anchor and anchor.line,
+  }
+  if not location.file or (location.side ~= "old" and location.side ~= "new") or not location.line then
+    return nil, error_result("invalid_location", "Invalid review location")
+  end
+  local resolved = self:resolve_location(location, anchor.context, opts.radius or self:get_context_radius())
+  if not resolved then
+    return nil, error_result("stale_location", "Location is no longer present")
+  end
+  return resolved, nil
 end
 
 ---@param win integer
@@ -1250,7 +1342,7 @@ local function setup_keymaps(view)
 end
 
 local function setup_autocmds(view)
-  local group = vim.api.nvim_create_augroup("ReviewDiff" .. view.id, { clear = true })
+  local group = vim.api.nvim_create_augroup("ReviewDiff" .. view.uid, { clear = true })
   view.autocmd_group = group
   for _, side in ipairs({ "old", "new" }) do
     vim.api.nvim_create_autocmd("CursorMoved", {
@@ -1330,7 +1422,7 @@ function M.open(input, opts)
 
   local current_win = vim.api.nvim_get_current_win()
   local view = setmetatable({
-    id = view_counter,
+    uid = view_counter,
     annotation_ns = annotation_ns,
     input = vim.deepcopy(input),
     options = opts,
@@ -1353,8 +1445,8 @@ function M.open(input, opts)
       bufnr = vim.api.nvim_win_get_buf(current_win),
     },
   }, View)
-  view.old_buf = create_scratch("review-diff://" .. (input.review_id or view.id) .. "/old")
-  view.new_buf = create_scratch("review-diff://" .. (input.review_id or view.id) .. "/new")
+  view.old_buf = create_scratch("review-diff://" .. (input.review_id or view.uid) .. "/old")
+  view.new_buf = create_scratch("review-diff://" .. (input.review_id or view.uid) .. "/new")
   view.files = model.build(input.files or {}, opts).files
   for _, file in ipairs(view.files) do
     view.state.collapsed_files[file.id] = opts.collapse_on_open

@@ -212,6 +212,115 @@ describe("review diff view", function()
     assert.are.same({ file = "lua/example.lua", side = "new", line = 2 }, view:get_cursor_location())
   end)
 
+  it("exposes review metadata without mutable internals", function()
+    view = viewer.open({
+      cwd = vim.fn.getcwd(),
+      repo_root = vim.fn.getcwd(),
+      review_id = "review-handle-metadata",
+      label = "HEAD..WORKTREE",
+      spec = { old = { kind = "ref", name = "HEAD" }, new = { kind = "worktree" } },
+      files = {
+        {
+          id = "lua/example.lua",
+          old_path = "lua/example.lua",
+          new_path = "lua/example.lua",
+          old_text = "one\ntwo",
+          new_text = "one\nthree",
+          status = "modified",
+        },
+      },
+    }, { syntax = false })
+
+    local metadata = view:metadata()
+
+    assert.are.equal("review-handle-metadata", view:id())
+    assert.are.equal("review-handle-metadata", metadata.review_id)
+    assert.are.equal("HEAD..WORKTREE", metadata.label)
+    assert.are.equal(vim.fn.getcwd(), metadata.repo_root)
+    assert.are.equal(3, metadata.context_radius)
+    assert.are.same({
+      {
+        id = "lua/example.lua",
+        old_path = "lua/example.lua",
+        new_path = "lua/example.lua",
+        status = "modified",
+        binary = nil,
+        too_large = nil,
+      },
+    }, metadata.files)
+
+    metadata.files[1].new_path = "mutated.lua"
+    assert.are.equal("lua/example.lua", view:metadata().files[1].new_path)
+  end)
+
+  it("returns cursor context with source context", function()
+    view = viewer.open({
+      repo_root = vim.fn.getcwd(),
+      review_id = "review-handle-cursor",
+      spec = { old = { kind = "ref", name = "HEAD" }, new = { kind = "worktree" } },
+      files = {
+        {
+          id = "lua/example.lua",
+          old_path = "lua/example.lua",
+          new_path = "lua/example.lua",
+          old_text = "one\ntwo\nthree",
+          new_text = "one\nchanged\nthree",
+          status = "modified",
+        },
+      },
+    }, { context_lines = 1, syntax = false })
+
+    local cursor, err = view:cursor_context({ include_context = true })
+
+    assert.is_nil(err)
+    assert.are.same({ file = "lua/example.lua", side = "new", line = 2 }, cursor.location)
+    assert.are.same({ "one", "changed", "three" }, cursor.context.lines)
+    assert.are.equal("one\nchanged\nthree", cursor.context.text)
+    assert.are.equal(1, cursor.context.start_line)
+    assert.are.equal(1, cursor.context.radius)
+  end)
+
+  it("returns structured errors when cursor is not on a source line", function()
+    view = viewer.open({
+      repo_root = vim.fn.getcwd(),
+      review_id = "review-handle-cursor-error",
+      spec = { old = { kind = "ref", name = "HEAD" }, new = { kind = "worktree" } },
+      files = {},
+    }, { syntax = false })
+
+    local cursor, err = view:cursor_context()
+
+    assert.is_nil(cursor)
+    assert.are.equal("not_on_source_line", err.code)
+  end)
+
+  it("resolves anchors through the public handle", function()
+    view = viewer.open({
+      repo_root = vim.fn.getcwd(),
+      review_id = "review-handle-anchor",
+      spec = { old = { kind = "ref", name = "HEAD" }, new = { kind = "worktree" } },
+      files = {
+        {
+          id = "lua/example.lua",
+          old_path = "lua/example.lua",
+          new_path = "lua/example.lua",
+          old_text = "one\ntwo\nchanged",
+          new_text = "zero\none\ntwo\nchanged",
+          status = "modified",
+        },
+      },
+    }, { syntax = false })
+
+    local location = view:resolve_anchor({
+      file = "lua/example.lua",
+      side = "new",
+      line = 2,
+      context = "one\ntwo\nchanged",
+    })
+
+    assert.are.same({ file = "lua/example.lua", side = "new", line = 3 }, location)
+  end)
+
   it("places annotations through source locations", function()
     view = viewer.open({
       repo_root = vim.fn.getcwd(),
