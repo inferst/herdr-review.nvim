@@ -690,6 +690,34 @@ describe("review diff view", function()
     assert.are.same({}, view.state.expanded_folds)
   end)
 
+  it("registers public actions without exposing keymap internals", function()
+    view = viewer.open({
+      repo_root = vim.fn.getcwd(),
+      review_id = "review-actions",
+      spec = { old = { kind = "ref", name = "HEAD" }, new = { kind = "worktree" } },
+      files = {},
+    }, { syntax = false })
+
+    local called = false
+    local ok, err = view:add_action({
+      id = "test.action",
+      key = "gx",
+      desc = "Test action",
+      label = "Run test action",
+      callback = function(current_view)
+        called = current_view == view
+      end,
+    })
+
+    assert.is_true(ok)
+    assert.is_nil(err)
+    vim.api.nvim_set_current_win(view.new_win)
+    vim.cmd("normal gx")
+
+    assert.is_true(called)
+    assert.are.equal("Run test action", view:metadata().actions["test.action"])
+  end)
+
   it("invalidates itself when the review tab is closed externally", function()
     view = viewer.open({
       repo_root = vim.fn.getcwd(),

@@ -279,6 +279,7 @@ function View:metadata()
     spec = vim.deepcopy(self.input.spec),
     context_radius = self:get_context_radius(),
     files = self:get_files(),
+    actions = vim.deepcopy(self.actions or {}),
   }
 end
 
@@ -1223,6 +1224,36 @@ end
 
 View.register_keymap = View.map
 
+function View:add_action(action)
+  if not action or not action.id or not action.key or not action.callback then
+    return false, error_result("invalid_action", "Invalid review action")
+  end
+  self.actions = self.actions or {}
+  if self.actions[action.id] then
+    return false, error_result("action_key_conflict", "Review action is already registered")
+  end
+  self.actions[action.id] = action.label or action.desc or action.id
+  self:map({
+    key = action.key,
+    action = action.label or action.desc or action.id,
+    desc = action.desc or action.label or action.id,
+    callback = function()
+      action.callback(self)
+    end,
+  })
+  return true, nil
+end
+
+function View:set_actions(actions)
+  for _, action in ipairs(actions or {}) do
+    local ok, err = self:add_action(action)
+    if not ok then
+      return false, err
+    end
+  end
+  return true, nil
+end
+
 function View:show_help()
   local lines = { "Review Diff keymaps", "" }
   local keys = {}
@@ -1499,6 +1530,7 @@ function M.open(input, opts)
     annotation_order = {},
     syntax_cache = {},
     keymaps = {},
+    actions = {},
     win_sides = {},
     last_side = "new",
     state = {
