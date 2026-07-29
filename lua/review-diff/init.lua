@@ -178,6 +178,4 @@ function M.setup(opts)
   M.options = vim.tbl_deep_extend("force", vim.deepcopy(DEFAULT_OPTIONS), opts or {})
 end
 
-M.View = view_module.View
-
 return M
