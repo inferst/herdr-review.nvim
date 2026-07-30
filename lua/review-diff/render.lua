@@ -151,6 +151,9 @@ end
 ---@param side "old"|"new"
 ---@return string
 function M.text(row, side)
+  if row.display_kind == "diff_header" then
+    return side == "old" and (row.header_old or "") or (row.header_new or "")
+  end
   if row.display_kind == "hint" then
     return row.hint_text or ""
   end
@@ -184,6 +187,13 @@ end
 ---@param opts table|nil
 ---@return string|nil, table|nil
 function M.highlight(row, side, opts)
+  if row.display_kind == "diff_header" then
+    local header_text = side == "old" and (row.header_old or "") or (row.header_new or "")
+    if header_text == "" then
+      return nil, nil
+    end
+    return "ReviewDiffFileHeader", nil
+  end
   if row.display_kind == "hint" then
     local hint_text = row.hint_text or ""
     if hint_text == "" then
