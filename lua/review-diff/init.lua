@@ -114,6 +114,22 @@ local function setup_autocmds(view)
       end
     end,
   })
+  vim.api.nvim_create_autocmd("WinEnter", {
+    group = group,
+    callback = function()
+      if view.closed then
+        return
+      end
+      local current_win = vim.api.nvim_get_current_win()
+      local in_diff = view.win_sides[current_win] ~= nil
+      for _, side in ipairs({ "old", "new" }) do
+        local win = view[side .. "_win"]
+        if layout.valid_window(win) then
+          vim.wo[win].scrollbind = in_diff
+        end
+      end
+    end,
+  })
 end
 
 ---@param input table
