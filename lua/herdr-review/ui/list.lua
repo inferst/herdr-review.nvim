@@ -108,12 +108,13 @@ function M.open_list()
     title_pos = "center",
   })
 
-  vim.wo[win].cursorline = true
-  vim.wo[win].cursorlineopt = "line"
-  vim.wo[win].wrap = false
-  vim.wo[win].number = false
-  vim.wo[win].relativenumber = false
-  vim.wo[win].signcolumn = "no"
+  local win_opts = { scope = "local", win = win }
+  vim.api.nvim_set_option_value("cursorline", true, win_opts)
+  vim.api.nvim_set_option_value("cursorlineopt", "line", win_opts)
+  vim.api.nvim_set_option_value("wrap", false, win_opts)
+  vim.api.nvim_set_option_value("number", false, win_opts)
+  vim.api.nvim_set_option_value("relativenumber", false, win_opts)
+  vim.api.nvim_set_option_value("signcolumn", "no", win_opts)
 
   local function render(selected_id, selected_row)
     local refreshed = load_comments(range)

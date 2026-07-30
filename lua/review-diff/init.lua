@@ -125,7 +125,7 @@ local function setup_autocmds(view)
       for _, side in ipairs({ "old", "new" }) do
         local win = view[side .. "_win"]
         if layout.valid_window(win) then
-          vim.wo[win].scrollbind = in_diff
+          vim.api.nvim_set_option_value("scrollbind", in_diff, { scope = "local", win = win })
         end
       end
     end,
