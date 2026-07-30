@@ -98,13 +98,18 @@ function M.write_rows(view, side, rows, start_row0, end_row0)
         })
       end
     end
-    if inline and inline.finish > inline.start then
-      vim.api.nvim_buf_set_extmark(bufnr, render_ns, row0, inline.start, {
-        end_row = row0,
-        end_col = inline.finish,
-        hl_group = inline.hl_group,
-        priority = 80,
-      })
+    if inline then
+      local items = inline.hl_group and { inline } or inline
+      for _, item in ipairs(items) do
+        if item.finish > item.start then
+          vim.api.nvim_buf_set_extmark(bufnr, render_ns, row0, item.start, {
+            end_row = row0,
+            end_col = item.finish,
+            hl_group = item.hl_group,
+            priority = 80,
+          })
+        end
+      end
     end
   end
 end
