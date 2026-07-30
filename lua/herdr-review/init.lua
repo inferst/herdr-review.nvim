@@ -9,6 +9,7 @@ local M = {}
 local setup_options = {}
 local active_job
 local generation = 0
+local last_spec = nil
 
 local function git_completion(arglead)
   local output = vim.fn.systemlist({
@@ -121,6 +122,7 @@ local function attach_view(view)
 end
 
 local function start_review(spec)
+  last_spec = spec
   generation = generation + 1
   local request_generation = generation
   local cwd = vim.fn.getcwd()
@@ -208,9 +210,18 @@ function M.setup(opts)
 
   pcall(vim.api.nvim_del_user_command, "ReviewDiff")
   vim.api.nvim_create_user_command("ReviewDiff", function(command)
-    start_review(spec_module.parse(command.fargs))
+    if command.bang then
+      if not last_spec then
+        vim.notify("No previous diff to reopen", vim.log.levels.WARN)
+        return
+      end
+      start_review(last_spec)
+    else
+      start_review(spec_module.parse(command.fargs))
+    end
   end, {
     nargs = "*",
+    bang = true,
     complete = git_completion,
     desc = "Open a Git review diff",
   })
