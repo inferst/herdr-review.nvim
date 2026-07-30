@@ -38,27 +38,4 @@ describe("review diff adapter", function()
     assert.are.equal("old", side)
     assert.are.equal(1, line)
   end)
-
-  it("captures viewer buffer context", function()
-    view = viewer.open({
-      repo_root = vim.fn.getcwd(),
-      review_id = "adapter-2",
-      spec = { old = { kind = "ref", name = "HEAD" }, new = { kind = "worktree" } },
-      files = {
-        {
-          id = "lua/init.lua",
-          old_path = "lua/init.lua",
-          new_path = "lua/init.lua",
-          old_text = "old",
-          new_text = "new",
-          status = "modified",
-        },
-      },
-    })
-
-    local context = diff.capture_buffer_context(view.new_buf)
-    assert.are.same({ side = "new", path = "lua/init.lua", file = { path = "lua/init.lua" } }, context)
-    assert.are.equal("new", diff.get_buf_side(view.new_buf))
-    assert.are.equal("lua/init.lua", diff.get_buf_path(view.new_buf))
-  end)
 end)

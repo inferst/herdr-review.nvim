@@ -1,9 +1,9 @@
 local render = require("review-diff.render")
+local syntax_layer = require("review-diff.syntax_layer")
 
 local M = {}
 
 local render_ns = vim.api.nvim_create_namespace("review-diff-render")
-local syntax_ns = vim.api.nvim_create_namespace("review-diff-syntax")
 
 ---Builds a relative line index for one file's display rows, mapping each
 ---side's source line number to its 1-based offset within `rows`.
@@ -109,55 +109,6 @@ function M.write_rows(view, side, rows, start_row0, end_row0)
   end
 end
 
----Re-applies cached Tree-sitter syntax spans for exactly one file, within its
----current buffer range. Leaves every other file's syntax extmarks untouched.
----@param view table
----@param file table
----@param range table {start, count}
-function M.apply_syntax_for_file(view, file, range)
-  vim.api.nvim_buf_clear_namespace(view.old_buf, syntax_ns, range.start - 1, range.start - 1 + range.count)
-  vim.api.nvim_buf_clear_namespace(view.new_buf, syntax_ns, range.start - 1, range.start - 1 + range.count)
-
-  local syntax_options = view.options.syntax
-  if syntax_options == false or (type(syntax_options) == "table" and syntax_options.enabled == false) then
-    return
-  end
-  if file.binary or file.too_large then
-    return
-  end
-
-  local cache = view.syntax_cache[file.id]
-  local file_index = view.row_index[file.id]
-  if not cache or not file_index then
-    return
-  end
-
-  for _, side in ipairs({ "old", "new" }) do
-    local bufnr = view[side .. "_buf"]
-    local cached = cache[side]
-    local side_index = file_index[side]
-    if cached and side_index then
-      for _, span in ipairs(cached.spans) do
-        local relative = side_index[span.line]
-        if relative then
-          local row_index = range.start + relative - 1
-          local start_col = span.start_col
-          local end_col = span.end_col
-          if end_col > start_col then
-            vim.api.nvim_buf_set_extmark(bufnr, syntax_ns, row_index - 1, start_col, {
-              end_row = row_index - 1,
-              end_col = end_col,
-              hl_group = span.hl_group,
-              hl_mode = "combine",
-              priority = span.priority,
-            })
-          end
-        end
-      end
-    end
-  end
-end
-
 ---Re-renders exactly one file's rows in place: buffer lines, base highlight
 ---extmarks, and cached syntax extmarks. Every other file's buffer lines and
 ---extmarks are left untouched, and their absolute positions are shifted
@@ -201,7 +152,7 @@ function M.render_file(view, file)
     end
   end
 
-  M.apply_syntax_for_file(view, file, range)
+  syntax_layer.apply_for_file(view, file, range)
   view:apply_annotations()
   view:update_cursorline()
   view:emit("rendered")

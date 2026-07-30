@@ -2,20 +2,15 @@ local comments = require("herdr-review.comments")
 local config = require("herdr-review.config")
 local diff = require("herdr-review.diff")
 local session = require("herdr-review.session")
-local storage = require("herdr-review.storage")
+local util = require("herdr-review.ui.util")
 
 local M = {}
-
-local function notify_storage_error(err)
-  vim.notify(err or "Could not access review session", vim.log.levels.ERROR)
-end
 
 ---@param range string
 ---@return ReviewComment[]|nil
 local function load_comments(range)
-  local stored, err = storage.get_comments(range)
+  local stored = util.load_comments(range)
   if not stored then
-    notify_storage_error(err)
     return nil
   end
   local sorted = comments.sort(stored)
@@ -204,7 +199,7 @@ function M.open_list()
 
     local data, err = session.delete_comment(range, comment.id)
     if not data then
-      notify_storage_error(err)
+      util.notify_storage_error(err)
       return
     end
     render(nil, math.min(index, #loaded_comments - 1))

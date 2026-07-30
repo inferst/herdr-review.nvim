@@ -1,5 +1,5 @@
-describe("review diff git adapter", function()
-  local git = require("review-diff.git")
+describe("herdr review git adapter", function()
+  local git = require("herdr-review.git")
 
   it("parses modified, added, deleted, and renamed paths", function()
     local files = git.parse_name_status(table.concat({
@@ -45,7 +45,7 @@ describe("review diff git adapter", function()
 
     local resolved
     local failure
-    git.resolve(require("review-diff.spec").parse({}), { cwd = root }, {
+    git.resolve(require("herdr-review.spec").parse({}), { cwd = root }, {
       on_ready = function(model)
         resolved = model
       end,

@@ -126,13 +126,6 @@ describe("review session", function()
     assert.are.equal(0, #vim.api.nvim_buf_get_extmarks(view.new_buf, view.annotation_ns, 0, -1, {}))
   end)
 
-  it("does not place direct extmarks outside the buffer", function()
-    session.place_extmark(view.new_buf, 100, "Out of range")
-
-    local marks = vim.api.nvim_buf_get_extmarks(view.new_buf, config.ns, 0, -1, {})
-    assert.are.equal(0, #marks)
-  end)
-
   it("reanchors comments from their saved context", function()
     local _, err = storage.add_comment("HEAD..WORKTREE", {
       id = "comment-anchor",

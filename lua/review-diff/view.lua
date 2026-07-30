@@ -1,6 +1,5 @@
 local model = require("review-diff.model")
 local render = require("review-diff.render")
-local syntax = require("review-diff.syntax")
 local layout = require("review-diff.layout")
 local locations = require("review-diff.locations")
 local state_module = require("review-diff.state")
@@ -8,8 +7,11 @@ local annotations = require("review-diff.annotations")
 local actions = require("review-diff.actions")
 local navigation = require("review-diff.navigation")
 local incremental = require("review-diff.incremental")
+local errors = require("review-diff.errors")
+local folds = require("review-diff.folds")
+local resolver = require("review-diff.resolver")
+local syntax_layer = require("review-diff.syntax_layer")
 
-local syntax_ns = vim.api.nvim_create_namespace("review-diff-syntax")
 local cursorline_ns = vim.api.nvim_create_namespace("review-diff-cursorline")
 
 local M = {}
@@ -26,26 +28,6 @@ local function file_metadata(file)
     binary = file.binary,
     too_large = file.too_large,
   }
-end
-
-local function error_result(code, message)
-  return { code = code, message = message }
-end
-
-local function context_result(lines, location, radius)
-  local start_line = math.max(1, location.line - radius)
-  return {
-    lines = lines,
-    text = table.concat(lines, "\n"),
-    start_line = start_line,
-    radius = radius,
-  }
-end
-
-local function syntax_value(file, side)
-  local path = locations.path(file, side)
-  local text = side == "old" and file.old_text or file.new_text
-  return path, text
 end
 
 function M.new(fields)
@@ -92,10 +74,6 @@ function View:get_repo_root()
   return self.input.repo_root
 end
 
-function View:id()
-  return self:get_review_id()
-end
-
 function View:metadata()
   return {
     review_id = self:get_review_id(),
@@ -123,25 +101,17 @@ function View:status()
   return "ready"
 end
 
-function View:repo_root()
-  return self:get_repo_root()
-end
-
 function View:context(location, opts)
   opts = opts or {}
   local radius = opts.radius or self:get_context_radius()
-  local lines, err = self:get_context(location, radius)
-  if not lines then
-    return nil, error_result(err == "file not found" and "file_not_found" or "stale_location", err)
-  end
-  return context_result(lines, location, radius), nil
+  return resolver.context(self.files, location, radius)
 end
 
 function View:cursor_context(opts)
   opts = opts or {}
   local location = self:get_cursor_location()
   if not location then
-    return nil, error_result("not_on_source_line", "Not on a source line in the review")
+    return nil, errors.result("not_on_source_line", "Not on a source line in the review")
   end
   local result = { location = location }
   if opts.include_context then
@@ -162,7 +132,7 @@ function View:buffer_context(bufnr)
     side = "new"
   end
   if not side then
-    return nil, error_result("not_review_buffer", "Buffer is not part of the review")
+    return nil, errors.result("not_review_buffer", "Buffer is not part of the review")
   end
   local current = self:get_cursor_location()
   local path = current and current.side == side and current.file or nil
@@ -177,11 +147,11 @@ function View:resolve_anchor(anchor, opts)
     line = anchor and anchor.line,
   }
   if not location.file or (location.side ~= "old" and location.side ~= "new") or not location.line then
-    return nil, error_result("invalid_location", "Invalid review location")
+    return nil, errors.result("invalid_location", "Invalid review location")
   end
   local resolved = self:resolve_location(location, anchor.context, opts.radius or self:get_context_radius())
   if not resolved then
-    return nil, error_result("stale_location", "Location is no longer present")
+    return nil, errors.result("stale_location", "Location is no longer present")
   end
   return resolved, nil
 end
@@ -218,50 +188,7 @@ function View:get_display_rows()
 end
 
 function View:apply_syntax()
-  for _, side in ipairs({ "old", "new" }) do
-    vim.api.nvim_buf_clear_namespace(self[side .. "_buf"], syntax_ns, 0, -1)
-  end
-
-  local syntax_options = self.options.syntax
-  if syntax_options == false or (type(syntax_options) == "table" and syntax_options.enabled == false) then
-    return
-  end
-
-  for _, side in ipairs({ "old", "new" }) do
-    local bufnr = self[side .. "_buf"]
-    for _, file in ipairs(self.files) do
-      local path, text = syntax_value(file, side)
-      if path and text and not file.binary and not file.too_large then
-        self.syntax_cache[file.id] = self.syntax_cache[file.id] or {}
-        local cached = self.syntax_cache[file.id][side]
-        if not cached or cached.path ~= path or cached.text ~= text then
-          cached = {
-            path = path,
-            text = text,
-            spans = syntax.collect(path, text, syntax_options),
-          }
-          self.syntax_cache[file.id][side] = cached
-        end
-
-        for _, span in ipairs(cached.spans) do
-          local row_index, _ = self:location_row({ file = path, side = side, line = span.line })
-          if row_index then
-            local start_col = span.start_col
-            local end_col = span.end_col
-            if end_col > start_col then
-              vim.api.nvim_buf_set_extmark(bufnr, syntax_ns, row_index - 1, start_col, {
-                end_row = row_index - 1,
-                end_col = end_col,
-                hl_group = span.hl_group,
-                hl_mode = "combine",
-                priority = span.priority,
-              })
-            end
-          end
-        end
-      end
-    end
-  end
+  return syntax_layer.apply(self)
 end
 
 function View:render()
@@ -356,38 +283,11 @@ function View:location_row(location)
 end
 
 function View:expand_source_row(file, source_index)
-  if not file then
-    return false
-  end
-  self.state.collapsed_files[file.id] = false
-  if not source_index then
-    return true
-  end
-  for _, row in ipairs(model.visible_rows(file, self.state.context_lines)) do
-    if row.kind == "fold" and source_index >= row.first_row and source_index <= row.last_row then
-      local key = string.format("%s:%d:%d", file.id, row.first_row, row.last_row)
-      self.state.expanded_folds[key] = true
-      break
-    end
-  end
-  return true
+  return folds.expand_source_row(self, file, source_index)
 end
 
 function View:expand_location(location)
-  local file = locations.file_for(self.files, location)
-  if not file then
-    return nil
-  end
-  local side_line = location.side .. "_line"
-  local source_index
-  for index, row in ipairs(file.rows) do
-    if row[side_line] == location.line then
-      source_index = index
-      break
-    end
-  end
-  self:expand_source_row(file, source_index)
-  return file
+  return folds.expand_location(self, location)
 end
 
 function View:open_location(location)
@@ -426,60 +326,11 @@ function View:get_cursor_location()
 end
 
 function View:get_context(location, radius)
-  local file = locations.file_for(self.files, location)
-  if not file then
-    return nil, "file not found"
-  end
-  local lines = location.side == "old" and file.old_lines or file.new_lines
-  if not location.line or not lines[location.line] then
-    return nil, "location is stale"
-  end
-  radius = radius or self.state.context_lines
-  local result = {}
-  for index = math.max(1, location.line - radius), math.min(#lines, location.line + radius) do
-    table.insert(result, lines[index])
-  end
-  return result, nil
+  return resolver.get_context(self.files, location, radius or self.state.context_lines)
 end
 
 function View:resolve_location(location, context, radius)
-  local file = locations.file_for(self.files, location)
-  if not file then
-    return nil
-  end
-  local lines = location.side == "old" and file.old_lines or file.new_lines
-  if not context or context == "" then
-    return lines[location.line] and vim.deepcopy(location) or nil
-  end
-
-  radius = radius or self.state.context_lines
-  local context_lines = vim.split(context, "\n", { plain = true, trimempty = false })
-  local anchor_index = location.line - math.max(1, location.line - radius) + 1
-  local best_line
-  local best_distance
-  for start = 1, #lines - #context_lines + 1 do
-    local matches = true
-    for offset, expected in ipairs(context_lines) do
-      if lines[start + offset - 1] ~= expected then
-        matches = false
-        break
-      end
-    end
-    if matches then
-      local candidate = start + anchor_index - 1
-      local distance = math.abs(candidate - location.line)
-      if not best_distance or distance < best_distance then
-        best_line = candidate
-        best_distance = distance
-      end
-    end
-  end
-  if not best_line then
-    return nil
-  end
-  local resolved = vim.deepcopy(location)
-  resolved.line = best_line
-  return resolved
+  return resolver.resolve_location(self.files, location, context, radius or self.state.context_lines)
 end
 
 function View:set_cursor_row(row_index)
@@ -487,92 +338,23 @@ function View:set_cursor_row(row_index)
 end
 
 function View:toggle_file_at_cursor()
-  local cursor = vim.api.nvim_win_get_cursor(vim.api.nvim_get_current_win())
-  local row = self.display_rows[cursor[1]]
-  if not row or not row.file_id then
-    return
-  end
-  local file_id = row.file_id
-  self.state.collapsed_files[file_id] = not self.state.collapsed_files[file_id]
-  self:render_file(row.file)
-  if self.state.collapsed_files[file_id] then
-    for index, display_row in ipairs(self.display_rows) do
-      if display_row.file_id == file_id then
-        self:set_cursor_row(index)
-        break
-      end
-    end
-  end
+  return folds.toggle_file_at_cursor(self)
 end
 
 function View:toggle_fold_at_cursor()
-  local cursor = vim.api.nvim_win_get_cursor(vim.api.nvim_get_current_win())
-  local row = self.display_rows[cursor[1]]
-  if not row then
-    return
-  end
-  if row.display_kind == "file_header" then
-    self:toggle_file_at_cursor()
-  elseif row.display_kind == "fold" then
-    local file_id = row.file_id
-    local target_first = row.fold.first_row
-    local target_last = row.fold.last_row
-    local key = string.format("%s:%d:%d", file_id, target_first, target_last)
-    local was_expanded = self.state.expanded_folds[key]
-    self.state.expanded_folds[key] = not was_expanded
-    self:render_file(row.file)
-    if was_expanded then
-      for index, display_row in ipairs(self.display_rows) do
-        if
-          display_row.display_kind == "fold"
-          and display_row.file_id == file_id
-          and display_row.fold.first_row == target_first
-          and display_row.fold.last_row == target_last
-        then
-          self:set_cursor_row(index)
-          break
-        end
-      end
-    end
-  end
+  return folds.toggle_fold_at_cursor(self)
 end
 
 function View:expand_all()
-  for _, file in ipairs(self.files) do
-    self.state.collapsed_files[file.id] = false
-  end
-  self.state.expanded_folds = {}
-  for _, file in ipairs(self.files) do
-    for _, row in ipairs(model.visible_rows(file, self.state.context_lines)) do
-      if row.kind == "fold" then
-        local key = string.format("%s:%d:%d", file.id, row.first_row, row.last_row)
-        self.state.expanded_folds[key] = true
-      end
-    end
-  end
-  self:render()
+  return folds.expand_all(self)
 end
 
 function View:collapse_all()
-  for _, file in ipairs(self.files) do
-    self.state.collapsed_files[file.id] = true
-  end
-  self.state.expanded_folds = {}
-  self:render()
+  return folds.collapse_all(self)
 end
 
 function View:toggle_all()
-  local all_collapsed = true
-  for _, file in ipairs(self.files) do
-    if not self.state.collapsed_files[file.id] then
-      all_collapsed = false
-      break
-    end
-  end
-  for _, file in ipairs(self.files) do
-    self.state.collapsed_files[file.id] = not all_collapsed
-  end
-  self:render()
+  return folds.toggle_all(self)
 end
 
 function View:move_file(direction)
@@ -622,8 +404,6 @@ function View:map(mapping)
     })
   end
 end
-
-View.register_keymap = View.map
 
 function View:add_action(action)
   return actions.add(self, action)

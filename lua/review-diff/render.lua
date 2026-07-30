@@ -1,5 +1,6 @@
 local locations = require("review-diff.locations")
 local model = require("review-diff.model")
+local folds = require("review-diff.folds")
 
 local M = {}
 
@@ -83,7 +84,7 @@ local function path_label(file, side)
 end
 
 local function fold_key(file, row)
-  return string.format("%s:%d:%d", file.id, row.first_row, row.last_row)
+  return folds.key(file.id, row.first_row, row.last_row)
 end
 
 ---@param files table[]

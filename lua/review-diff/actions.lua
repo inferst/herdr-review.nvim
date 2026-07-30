@@ -1,18 +1,15 @@
-local M = {}
-
-local function error_result(code, message)
-  return { code = code, message = message }
-end
-
 local layout = require("review-diff.layout")
+local errors = require("review-diff.errors")
+
+local M = {}
 
 function M.add(view, action)
   if not action or not action.id or not action.key or not action.callback then
-    return false, error_result("invalid_action", "Invalid review action")
+    return false, errors.result("invalid_action", "Invalid review action")
   end
   view.actions = view.actions or {}
   if view.actions[action.id] then
-    return false, error_result("action_key_conflict", "Review action is already registered")
+    return false, errors.result("action_key_conflict", "Review action is already registered")
   end
   view.actions[action.id] = action.label or action.desc or action.id
   view:map({

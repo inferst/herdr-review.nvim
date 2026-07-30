@@ -1,5 +1,3 @@
-local config = require("herdr-review.config")
-local diff = require("herdr-review.diff")
 local storage = require("herdr-review.storage")
 local viewer = require("review-diff")
 
@@ -74,24 +72,6 @@ end
 function M.get_commit_range()
   local view = viewer.current()
   return view and view:get_review_id() or nil
-end
-
----@param bufnr integer
----@param line integer
----@param text string
-function M.place_extmark(bufnr, line, text)
-  if line < 1 or line > vim.api.nvim_buf_line_count(bufnr) then
-    return
-  end
-  vim.api.nvim_buf_set_extmark(bufnr, config.ns, line - 1, 0, {
-    virt_text = { { text, "Comment" } },
-    virt_text_pos = "eol",
-  })
-end
-
----@param bufnr integer
-function M.clear_extmarks(bufnr)
-  vim.api.nvim_buf_clear_namespace(bufnr, config.ns, 0, -1)
 end
 
 ---@param range string
@@ -177,31 +157,12 @@ function M.get_pending_view_state()
   return pending_view_state and vim.deepcopy(pending_view_state) or nil
 end
 
----@param bufnr integer
----@param _file string|nil
-function M.on_buf_enter(bufnr, _file)
-  local view = viewer.current()
-  if not view then
-    return
-  end
-  diff.capture_buffer_context(bufnr)
-  local range = view:get_review_id()
-  if range and state.current_range ~= range then
-    M.load_session(range, view)
-  end
-end
-
 function M.reset()
   state.current_range = nil
   state.current_view = nil
   state.stale_ids = {}
   state.resolved_locations = {}
   pending_view_state = nil
-  for _, bufnr in ipairs(vim.api.nvim_list_bufs()) do
-    if vim.api.nvim_buf_is_loaded(bufnr) then
-      M.clear_extmarks(bufnr)
-    end
-  end
 end
 
 function M.on_view_closed(view)

@@ -1,7 +1,5 @@
 local M = {}
 
-M.ns = vim.api.nvim_create_namespace("herdr-review")
-
 M.data_dir = vim.fn.stdpath("data") .. "/herdr-review"
 
 M.list_width = 80

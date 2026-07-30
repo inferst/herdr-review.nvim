@@ -3,23 +3,9 @@ local diff = require("herdr-review.diff")
 local paths = require("herdr-review.paths")
 local session = require("herdr-review.session")
 local storage = require("herdr-review.storage")
+local util = require("herdr-review.ui.util")
 
 local M = {}
-
-local function notify_storage_error(err)
-  vim.notify(err or "Could not access review session", vim.log.levels.ERROR)
-end
-
----@param range string
----@return ReviewComment[]|nil
-local function load_comments(range)
-  local stored, err = storage.get_comments(range)
-  if not stored then
-    notify_storage_error(err)
-    return nil
-  end
-  return stored
-end
 
 function M.create_comment()
   local view = diff.get_current_view()
@@ -36,7 +22,7 @@ function M.create_comment()
   end
 
   file = paths.normalize(file)
-  local stored = load_comments(range)
+  local stored = util.load_comments(range)
   if not stored then
     return
   end
@@ -77,7 +63,7 @@ function M.create_comment()
     end
 
     if not data then
-      notify_storage_error(err)
+      util.notify_storage_error(err)
       return
     end
 
@@ -100,7 +86,7 @@ function M.delete_comment_at_cursor()
   end
 
   file = paths.normalize(file)
-  local stored = load_comments(range)
+  local stored = util.load_comments(range)
   if not stored then
     return
   end
@@ -112,7 +98,7 @@ function M.delete_comment_at_cursor()
 
   local _, err = session.delete_comment(range, existing.id)
   if err then
-    notify_storage_error(err)
+    util.notify_storage_error(err)
     return
   end
 
@@ -131,7 +117,7 @@ function M.edit_comment(range, comment, list_win, refresh)
 
     local data, err = session.update_comment(range, comment.id, { text = text })
     if not data then
-      notify_storage_error(err)
+      util.notify_storage_error(err)
       return
     end
 

@@ -124,7 +124,7 @@ vim.api.nvim_set_hl(0, "ReviewDiffAdd", { bg = "#1e3a1e", fg = "#ffffff" })
 The standalone viewer lives under the `review-diff` namespace and accepts a resolved diff model independent of Git:
 
 ```lua
-local review = require("review-diff").open_resolved({
+local review = require("review-diff").open({
   repo_root = "/project",
   review_id = "stable-id",
   spec = spec,
