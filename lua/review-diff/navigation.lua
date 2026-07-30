@@ -189,8 +189,10 @@ function M.move_hunk(view, direction)
     return
   end
 
-  view:expand_source_row(target.file, target.source_index)
-  view:render()
+  local expanded = view:expand_source_row(target.file, target.source_index)
+  if expanded then
+    view:render_file(target.file)
+  end
 
   local row_index = display_row_for_source_index(view, target.file, target.source_index)
   if row_index then

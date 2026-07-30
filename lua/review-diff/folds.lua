@@ -13,6 +13,9 @@ function M.key(file_id, first_row, last_row)
 end
 
 ---Expands a file and, when given, the context fold containing a source row.
+---Returns true only when the state actually changed (i.e. a collapsed file was
+---opened or a hidden fold was expanded). Returns false when the file is already
+---visible and no fold needed expanding.
 ---@param view table
 ---@param file table|nil
 ---@param source_index integer|nil
@@ -21,17 +24,25 @@ function M.expand_source_row(view, file, source_index)
   if not file then
     return false
   end
-  view.state.collapsed_files[file.id] = false
+  local changed = false
+  if view.state.collapsed_files[file.id] then
+    view.state.collapsed_files[file.id] = false
+    changed = true
+  end
   if not source_index then
-    return true
+    return changed
   end
   for _, row in ipairs(model.visible_rows(file, view.state.context_lines)) do
     if row.kind == "fold" and source_index >= row.first_row and source_index <= row.last_row then
-      view.state.expanded_folds[M.key(file.id, row.first_row, row.last_row)] = true
+      local key = M.key(file.id, row.first_row, row.last_row)
+      if not view.state.expanded_folds[key] then
+        view.state.expanded_folds[key] = true
+        changed = true
+      end
       break
     end
   end
-  return true
+  return changed
 end
 
 ---Expands whichever fold hides the source line for a location.
