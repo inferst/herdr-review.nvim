@@ -6,6 +6,10 @@ local ignored_captures = {
   spell = true,
 }
 
+local injection_providers = {
+  markdown = require("review-diff.syntax.markdown"),
+}
+
 local function source_lines(text)
   local lines = vim.split(text or "", "\n", { plain = true, trimempty = false })
   if #lines == 0 then
@@ -26,6 +30,23 @@ local function language_for_path(path)
 
   local ok, language = pcall(vim.treesitter.language.get_lang, filetype)
   return ok and language or nil
+end
+
+---@param filetype string
+---@return string|nil
+function M.language_for_filetype(filetype)
+  if not filetype or not vim.treesitter.language.get_lang then
+    return nil
+  end
+  local ok, language = pcall(vim.treesitter.language.get_lang, filetype)
+  if not ok or not language then
+    return nil
+  end
+  local query_ok, query = pcall(vim.treesitter.query.get, language, "highlights")
+  if not query_ok or not query then
+    return nil
+  end
+  return language
 end
 
 local function add_capture_spans(spans, query, node, _, lines)
@@ -73,6 +94,41 @@ local function collect_from_buffer(bufnr, language, lines)
   return spans
 end
 
+---Collect syntax spans from injected language blocks (e.g. fenced code in markdown).
+---@param spans table[]
+---@param injection table
+local function append_injection_spans(spans, injection)
+  local injected = M.collect_for_language(injection.lines, injection.lang)
+  for _, span in ipairs(injected) do
+    table.insert(spans, {
+      line = injection.line_offset + span.line,
+      start_col = span.start_col,
+      end_col = span.end_col,
+      hl_group = span.hl_group,
+      priority = span.priority,
+    })
+  end
+end
+
+---Collect syntax spans for the given lines and language without path-based detection.
+---@param lines string[]
+---@param language string
+---@return table[]
+function M.collect_for_language(lines, language)
+  local bufnr = vim.api.nvim_create_buf(false, true)
+  local ok, spans = pcall(function()
+    vim.bo[bufnr].buftype = "nofile"
+    vim.bo[bufnr].bufhidden = "wipe"
+    vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, lines)
+    return collect_from_buffer(bufnr, language, lines)
+  end)
+  pcall(vim.api.nvim_buf_delete, bufnr, { force = true })
+  if not ok then
+    return {}
+  end
+  return spans
+end
+
 ---@param path string|nil
 ---@param text string|nil
 ---@param opts table|nil
@@ -110,6 +166,14 @@ function M.collect(path, text, opts)
   if not ok then
     return {}
   end
+
+  local provider = injection_providers[language]
+  if provider then
+    for _, injection in ipairs(provider.get_injections(lines, M)) do
+      append_injection_spans(spans, injection)
+    end
+  end
+
   return spans
 end
 
