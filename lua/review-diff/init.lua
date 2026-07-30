@@ -89,20 +89,12 @@ local function setup_autocmds(view)
       end,
     })
   end
-  vim.api.nvim_create_autocmd("WinResized", {
-    group = group,
-    callback = function()
-      if not view.closed and not view.rendering and vim.api.nvim_get_current_tabpage() == view.tabpage then
-        view:render()
-      end
-    end,
-  })
   vim.api.nvim_create_autocmd("VimResized", {
     group = group,
     callback = function()
       if not view.closed and not view.rendering and vim.api.nvim_get_current_tabpage() == view.tabpage then
         vim.cmd("wincmd =")
-        view:render()
+        view:render_hint()
       end
     end,
   })

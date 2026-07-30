@@ -212,6 +212,9 @@ function View:render()
       table.insert(self.display_rows, 1, { display_kind = "hint", hint_text = hint_lines[i] })
     end
     table.insert(self.display_rows, #hint_lines + 1, { display_kind = "hint", hint_text = "" })
+    self.hint_row_count = #hint_lines + 1
+  else
+    self.hint_row_count = 0
   end
   self.rendering = true
   for _, side in ipairs({ "old", "new" }) do
@@ -231,6 +234,46 @@ end
 ---@param file table
 function View:render_file(file)
   incremental.render_file(self, file)
+end
+
+---Re-renders only the hint rows at the top of the buffers, re-wrapping the
+---hint text to the current window width. Does not touch diff content, syntax,
+---or annotations. Call this on WinResized / VimResized.
+function View:render_hint()
+  if not self.hint_text then
+    return
+  end
+  local old_count = self.hint_row_count or 0
+  local width = vim.api.nvim_win_get_width(self.old_win)
+  local hint_lines = render.wrap_hint_text(self.hint_text, width)
+  local new_count = #hint_lines + 1
+
+  local new_rows = {}
+  for i = #hint_lines, 1, -1 do
+    table.insert(new_rows, 1, { display_kind = "hint", hint_text = hint_lines[i] })
+  end
+  table.insert(new_rows, new_count, { display_kind = "hint", hint_text = "" })
+
+  for _ = 1, old_count do
+    table.remove(self.display_rows, 1)
+  end
+  for i, row in ipairs(new_rows) do
+    table.insert(self.display_rows, i, row)
+  end
+  self.hint_row_count = new_count
+
+  local delta = new_count - old_count
+  if delta ~= 0 and self.file_row_ranges then
+    for _, range in pairs(self.file_row_ranges) do
+      range.start = range.start + delta
+    end
+  end
+
+  self.rendering = true
+  for _, side in ipairs({ "old", "new" }) do
+    incremental.write_rows(self, side, new_rows, 0, old_count)
+  end
+  self.rendering = false
 end
 
 function View:update_cursorline()
