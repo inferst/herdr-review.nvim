@@ -116,7 +116,7 @@ function M.show_help(view)
     title = " Review Diff ",
     title_pos = "center",
   })
-  vim.wo[win].wrap = false
+  vim.api.nvim_set_option_value("wrap", false, { scope = "local", win = win })
   local close = function()
     if layout.valid_window(win) then
       vim.api.nvim_win_close(win, true)

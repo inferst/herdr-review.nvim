@@ -20,11 +20,13 @@ function M.create_scratch(name)
 end
 
 function M.set_window_options(win)
-  vim.wo[win].wrap = false
-  vim.wo[win].number = false
-  vim.wo[win].relativenumber = false
-  vim.wo[win].signcolumn = "no"
-  vim.wo[win].cursorline = true
+  local opts = { scope = "local", win = win }
+  vim.api.nvim_set_option_value("wrap", false, opts)
+  vim.api.nvim_set_option_value("number", false, opts)
+  vim.api.nvim_set_option_value("relativenumber", false, opts)
+  vim.api.nvim_set_option_value("signcolumn", "no", opts)
+  vim.api.nvim_set_option_value("cursorline", true, opts)
+  vim.api.nvim_set_option_value("scrollbind", true, opts)
 end
 
 function M.open_tab(view)
