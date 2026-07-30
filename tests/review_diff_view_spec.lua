@@ -231,7 +231,7 @@ describe("review diff view", function()
       },
     })
 
-    assert.are.same({ file = "lua/example.lua", side = "new", line = 2 }, view:get_cursor_location())
+    assert.are.same({ file = "lua/example.lua", side = "new", line = 2, col = 0 }, view:get_cursor_location())
   end)
 
   it("exposes review metadata without mutable internals", function()
@@ -295,7 +295,7 @@ describe("review diff view", function()
     local cursor, err = view:cursor_context({ include_context = true })
 
     assert.is_nil(err)
-    assert.are.same({ file = "lua/example.lua", side = "new", line = 2 }, cursor.location)
+    assert.are.same({ file = "lua/example.lua", side = "new", line = 2, col = 0 }, cursor.location)
     assert.are.same({ "one", "changed", "three" }, cursor.context.lines)
     assert.are.equal("one\nchanged\nthree", cursor.context.text)
     assert.are.equal(1, cursor.context.start_line)
@@ -471,11 +471,11 @@ describe("review diff view", function()
       },
     }, { syntax = false })
 
-    assert.are.same({ file = "lua/example.lua", side = "new", line = 2 }, view:get_cursor_location())
+    assert.are.same({ file = "lua/example.lua", side = "new", line = 2, col = 0 }, view:get_cursor_location())
 
     view:move_hunk(1)
 
-    assert.are.same({ file = "lua/example.lua", side = "new", line = 5 }, view:get_cursor_location())
+    assert.are.same({ file = "lua/example.lua", side = "new", line = 5, col = 0 }, view:get_cursor_location())
   end)
 
   it("wraps hunk navigation at the first and last hunk", function()
@@ -495,13 +495,13 @@ describe("review diff view", function()
       },
     }, { syntax = false })
 
-    assert.are.same({ file = "lua/example.lua", side = "new", line = 2 }, view:get_cursor_location())
+    assert.are.same({ file = "lua/example.lua", side = "new", line = 2, col = 0 }, view:get_cursor_location())
 
     view:move_hunk(-1)
-    assert.are.same({ file = "lua/example.lua", side = "new", line = 5 }, view:get_cursor_location())
+    assert.are.same({ file = "lua/example.lua", side = "new", line = 5, col = 0 }, view:get_cursor_location())
 
     view:move_hunk(1)
-    assert.are.same({ file = "lua/example.lua", side = "new", line = 2 }, view:get_cursor_location())
+    assert.are.same({ file = "lua/example.lua", side = "new", line = 2, col = 0 }, view:get_cursor_location())
   end)
 
   it("opens the target file when hunk navigation lands in a collapsed file", function()
@@ -538,7 +538,7 @@ describe("review diff view", function()
 
     assert.is_true(view.state.collapsed_files["lua/a.lua"])
     assert.is_false(view.state.collapsed_files["lua/b.lua"])
-    assert.are.same({ file = "lua/b.lua", side = "new", line = 2 }, view:get_cursor_location())
+    assert.are.same({ file = "lua/b.lua", side = "new", line = 2, col = 0 }, view:get_cursor_location())
   end)
 
   it("preserves the active diff side when moving between hunks", function()
@@ -562,7 +562,7 @@ describe("review diff view", function()
 
     view:move_hunk(1)
 
-    assert.are.same({ file = "lua/example.lua", side = "old", line = 5 }, view:get_cursor_location())
+    assert.are.same({ file = "lua/example.lua", side = "old", line = 5, col = 0 }, view:get_cursor_location())
   end)
 
   local function state_input(review_id)
@@ -620,7 +620,7 @@ describe("review diff view", function()
     assert.is_false(snapshot.collapsed_files["lua/a.lua"])
     assert.is_true(snapshot.collapsed_files["lua/b.lua"])
     assert.is_true(snapshot.expanded_folds[fold_key])
-    assert.are.same({ file = "lua/a.lua", side = "old", line = 3 }, snapshot.cursor)
+    assert.are.same({ file = "lua/a.lua", side = "old", line = 3, col = 0 }, snapshot.cursor)
   end)
 
   it("captures the last diff cursor after focus moves to the originating tab", function()
@@ -634,7 +634,7 @@ describe("review diff view", function()
 
     local snapshot = view:capture_state()
 
-    assert.are.same({ file = "lua/a.lua", side = "new", line = 3 }, snapshot.cursor)
+    assert.are.same({ file = "lua/a.lua", side = "new", line = 3, col = 0 }, snapshot.cursor)
   end)
 
   it("captures the path from the active side for renamed files", function()
@@ -657,7 +657,7 @@ describe("review diff view", function()
 
     local snapshot = view:capture_state()
 
-    assert.are.same({ file = "old.lua", side = "old", line = 1 }, snapshot.cursor)
+    assert.are.same({ file = "old.lua", side = "old", line = 1, col = 0 }, snapshot.cursor)
   end)
 
   it("restores state after ready callbacks during same-review replacement", function()
@@ -690,7 +690,25 @@ describe("review diff view", function()
     assert.is_false(view.state.collapsed_files["lua/a.lua"])
     assert.is_true(view.state.collapsed_files["lua/b.lua"])
     assert.is_true(view.state.expanded_folds[fold_key])
-    assert.are.same({ file = "lua/a.lua", side = "new", line = 3 }, view:get_cursor_location())
+    assert.are.same({ file = "lua/a.lua", side = "new", line = 3, col = 0 }, view:get_cursor_location())
+  end)
+
+  it("restores the cursor column when replacing with the same review", function()
+    view = viewer.open(state_input("review-state-col-restore"), { context_lines = 1, syntax = false })
+    view.state.collapsed_files["lua/a.lua"] = false
+    view:render()
+    set_cursor_at_location(view, { file = "lua/a.lua", side = "new", line = 3 })
+    vim.api.nvim_set_current_win(view.new_win)
+    local row = vim.api.nvim_win_get_cursor(view.new_win)[1]
+    vim.api.nvim_win_set_cursor(view.new_win, { row, 2 })
+    local snapshot = view:capture_state()
+
+    assert.are.same({ file = "lua/a.lua", side = "new", line = 3, col = 2 }, snapshot.cursor)
+
+    view:replace(state_input("review-state-col-restore"), { state = snapshot })
+
+    vim.api.nvim_set_current_win(view.new_win)
+    assert.are.same({ file = "lua/a.lua", side = "new", line = 3, col = 2 }, view:get_cursor_location())
   end)
 
   it("resets the layout when replacement changes the review identity", function()
