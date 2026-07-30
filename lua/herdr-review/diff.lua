@@ -57,20 +57,12 @@ function M.capture_buffer_context(bufnr)
   if not view then
     return nil
   end
-  local side
-  if bufnr == view.old_buf then
-    side = "old"
-  elseif bufnr == view.new_buf then
-    side = "new"
-  end
-  if not side then
+  local context = view:buffer_context(bufnr)
+  if not context then
     return nil
   end
-
-  local current = view:get_cursor_location()
-  local path = current and current.side == side and current.file or nil
-  M.set_buf_context(bufnr, side, path)
-  return { side = side, file = path and { path = path } or nil, path = path }
+  M.set_buf_context(bufnr, context.side, context.path)
+  return context
 end
 
 ---@return string|nil file, "old"|"new"|nil side, integer|nil line

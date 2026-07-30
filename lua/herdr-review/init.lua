@@ -68,29 +68,35 @@ local function attach_view(view)
     })
   end)
 
-  view:map({
-    key = config.keymaps.create_comment,
-    action = "Add comment",
-    desc = "Herdr Review: Add comment",
-    callback = ui.create_comment,
-  })
-  view:map({
-    key = config.keymaps.delete_comment,
-    action = "Delete comment",
-    desc = "Herdr Review: Delete comment",
-    callback = ui.delete_comment_at_cursor,
-  })
-  view:map({
-    key = config.keymaps.open_list,
-    action = "Open comment list",
-    desc = "Herdr Review: Open comment list",
-    callback = ui.open_list,
-  })
-  view:map({
-    key = config.keymaps.send_to_agent,
-    action = "Send to agent",
-    desc = "Herdr Review: Send to agent",
-    callback = ui.send_to_agent,
+  view:set_actions({
+    {
+      id = "herdr.comment.create",
+      key = config.keymaps.create_comment,
+      label = "Add comment",
+      desc = "Herdr Review: Add comment",
+      callback = ui.create_comment,
+    },
+    {
+      id = "herdr.comment.delete",
+      key = config.keymaps.delete_comment,
+      label = "Delete comment",
+      desc = "Herdr Review: Delete comment",
+      callback = ui.delete_comment_at_cursor,
+    },
+    {
+      id = "herdr.comment.list",
+      key = config.keymaps.open_list,
+      label = "Open comment list",
+      desc = "Herdr Review: Open comment list",
+      callback = ui.open_list,
+    },
+    {
+      id = "herdr.agent.send",
+      key = config.keymaps.send_to_agent,
+      label = "Send to agent",
+      desc = "Herdr Review: Send to agent",
+      callback = ui.send_to_agent,
+    },
   })
   if config.diff.show_hint then
     local hint_keys = {
@@ -184,7 +190,6 @@ function M.setup(opts)
     algorithm = "histogram",
     intra_line = true,
     collapse_on_open = config.diff.collapse_on_open,
-    line_numbers = config.diff.line_numbers,
     highlights = opts.highlights or config.highlights,
     syntax = {
       enabled = true,

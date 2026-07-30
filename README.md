@@ -88,7 +88,6 @@ require("herdr-review").setup({
     ignore_whitespace = false,
     collapse_on_open = true,
     intra_line = true,
-    line_numbers = true,
     max_file_bytes = 2 * 1024 * 1024,
     max_file_lines = 100000,
   },
@@ -122,28 +121,33 @@ vim.api.nvim_set_hl(0, "ReviewDiffAdd", { bg = "#1e3a1e", fg = "#ffffff" })
 
 ## Viewer interface
 
-The standalone viewer lives under the `review-diff` namespace and can be used with a resolved model independent of Git:
+The standalone viewer lives under the `review-diff` namespace and accepts a resolved diff model independent of Git:
 
 ```lua
-local view = require("review-diff").open({
+local review = require("review-diff").open_resolved({
   repo_root = "/project",
   review_id = "stable-id",
   spec = spec,
   files = resolved_files,
 })
 
-view:set_annotations({
+review:sync_annotations({
   {
     id = "comment-1",
-    location = { file = "lua/init.lua", side = "new", line = 12 },
+    anchor = {
+      file = "lua/init.lua",
+      side = "new",
+      line = 12,
+      context = "nearby\nsource\nlines",
+    },
     text = "Review this line",
   },
 })
 
-view:open_location({ file = "lua/init.lua", side = "new", line = 12 })
+review:open_location({ file = "lua/init.lua", side = "new", line = 12 })
 ```
 
-The viewer exposes source locations, source context, file metadata, review identity, lifecycle events, annotations, and keymap registration. It owns no comment persistence or herdr-specific behavior.
+The viewer exposes review identity, metadata, source locations, source context, anchor resolution, lifecycle events, annotations, and action registration. It owns no comment persistence or herdr-specific behaviour. Buffers, windows, display rows, extmarks, fold keys, and state snapshots are implementation details.
 
 ## Storage
 

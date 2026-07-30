@@ -29,39 +29,39 @@ local pending_view_state = nil
 ---@param range string
 local function apply_comments(view, comments, range)
   state.resolved_locations = {}
-  local locations = {}
-  local radius = context_radius(view)
-  for _, comment in ipairs(comments) do
-    local location =
-      view:resolve_location({ file = comment.file, side = comment.side, line = comment.line }, comment.context, radius)
-    locations[comment.id] = location
-    if location then
-      state.resolved_locations[comment.id] = location
-      view:expand_location(location)
-      if location.line ~= comment.line then
-        local context = view:get_context(location, radius)
-        storage.update_comment(range, comment.id, {
-          line = location.line,
-          context = context and table.concat(context, "\n") or comment.context,
-          context_start = math.max(1, location.line - radius),
-        })
-      end
-    end
-  end
-  view:render()
-
   local annotations = {}
+
   for _, comment in ipairs(comments) do
     table.insert(annotations, {
       id = comment.id,
-      location = locations[comment.id] or { file = comment.file, side = comment.side, line = nil },
+      anchor = {
+        file = comment.file,
+        side = comment.side,
+        line = comment.line,
+        context = comment.context,
+        context_start = comment.context_start,
+      },
       text = comment.text,
     })
   end
-  local result = view:set_annotations(annotations)
+
+  local result = view:sync_annotations(annotations, { radius = context_radius(view) })
+
   state.stale_ids = {}
   for _, id in ipairs(result.stale) do
     state.stale_ids[id] = true
+  end
+
+  for id, location in pairs(result.resolved or {}) do
+    state.resolved_locations[id] = location
+  end
+
+  for id, moved in pairs(result.moved or {}) do
+    storage.update_comment(range, id, {
+      line = moved.location.line,
+      context = moved.context,
+      context_start = moved.context_start,
+    })
   end
 end
 

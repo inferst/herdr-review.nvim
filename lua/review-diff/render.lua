@@ -88,25 +88,6 @@ local function path_label(file, side)
   return side_path(file, side) or "—"
 end
 
-local function source_line(row, side)
-  if side == "old" then
-    return row.source_row.old_line
-  end
-  return row.source_row.new_line
-end
-
----@param row table
----@param side "old"|"new"
----@param opts table|nil
----@return integer
-function M.source_prefix_width(row, side, opts)
-  if opts and opts.line_numbers == false then
-    return 0
-  end
-  local line = source_line(row, side)
-  return line and #string.format("%5d │ ", line) or #"      │ "
-end
-
 local function fold_key(file, row)
   return string.format("%s:%d:%d", file.id, row.first_row, row.last_row)
 end
@@ -173,10 +154,8 @@ end
 
 ---@param row table
 ---@param side "old"|"new"
----@param width integer|nil
----@param opts table|nil
 ---@return string
-function M.text(row, side, width, opts)
+function M.text(row, side)
   if row.display_kind == "hint" then
     return row.hint_text or ""
   end
@@ -196,27 +175,13 @@ function M.text(row, side, width, opts)
   end
 
   local source_row = row.source_row
-  local line
   local text
   if side == "old" then
-    line = source_row.old_line
     text = source_row.old_text
   else
-    line = source_row.new_line
     text = source_row.new_text
   end
-  if opts and opts.line_numbers == false then
-    if not line and width then
-      return ""
-    end
-    return text or ""
-  end
-  local prefix = line and string.format("%5d │ ", line) or "      │ "
-  if not line and width then
-    local remaining = math.max(0, width - vim.fn.strdisplaywidth(prefix))
-    return prefix .. string.rep(" ", remaining)
-  end
-  return prefix .. (text or "")
+  return text or ""
 end
 
 ---@param row table
@@ -282,20 +247,21 @@ function M.highlight(row, side, opts)
     inline_hl = "ReviewDiffAddIntra"
   end
 
-  local prefix_width = M.source_prefix_width(row, side, opts)
   if side == "old" then
     return line_hl,
       {
-        start = prefix_width + range.old_start,
-        finish = prefix_width + range.old_end,
+        start = range.old_start,
+        finish = range.old_end,
         hl_group = inline_hl,
+        line_text = line_text,
       }
   end
   return line_hl,
     {
-      start = prefix_width + range.new_start,
-      finish = prefix_width + range.new_end,
+      start = range.new_start,
+      finish = range.new_end,
       hl_group = inline_hl,
+      line_text = line_text,
     }
 end
 
