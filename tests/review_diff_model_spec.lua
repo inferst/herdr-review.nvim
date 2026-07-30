@@ -190,7 +190,7 @@ describe("review diff model", function()
     }, model.inline_ranges("two", "four"))
   end)
 
-  it("keeps intra-line highlights aligned after six-digit line numbers", function()
+  it("starts intra-line highlights at column 0", function()
     local _, inline = render.highlight({
       display_kind = "line",
       source_row = {
@@ -202,7 +202,7 @@ describe("review diff model", function()
       },
     }, "new", { intra_line = true })
 
-    assert.are.equal(#string.format("%5d │ ", 100000), inline.start)
+    assert.are.equal(0, inline.start)
   end)
 
   it("uses line-level highlighting unless intra-line mode is enabled", function()

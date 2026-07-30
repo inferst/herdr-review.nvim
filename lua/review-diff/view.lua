@@ -276,11 +276,10 @@ function View:apply_syntax()
         end
 
         for _, span in ipairs(cached.spans) do
-          local row_index, row = self:location_row({ file = path, side = side, line = span.line })
+          local row_index, _ = self:location_row({ file = path, side = side, line = span.line })
           if row_index then
-            local prefix_width = render.source_prefix_width(row, side, self.options)
-            local start_col = prefix_width + span.start_col
-            local end_col = prefix_width + span.end_col
+            local start_col = span.start_col
+            local end_col = span.end_col
             if end_col > start_col then
               vim.api.nvim_buf_set_extmark(bufnr, syntax_ns, row_index - 1, start_col, {
                 end_row = row_index - 1,

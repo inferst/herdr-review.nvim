@@ -88,7 +88,6 @@ require("herdr-review").setup({
     ignore_whitespace = false,
     collapse_on_open = true,
     intra_line = true,
-    line_numbers = true,
     max_file_bytes = 2 * 1024 * 1024,
     max_file_lines = 100000,
   },

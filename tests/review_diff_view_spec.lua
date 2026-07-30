@@ -53,8 +53,8 @@ describe("review diff view", function()
       assert.is_false(vim.bo[view.old_buf].buflisted)
       assert.is_false(vim.bo[view.new_buf].buflisted)
       assert.are.equal("▼ M lua/example.lua", vim.api.nvim_buf_get_lines(view.old_buf, 0, 1, false)[1])
-      assert.are.equal("    2 │ two", vim.api.nvim_buf_get_lines(view.old_buf, 2, 3, false)[1])
-      assert.are.equal("    2 │ three", vim.api.nvim_buf_get_lines(view.new_buf, 2, 3, false)[1])
+      assert.are.equal("two", vim.api.nvim_buf_get_lines(view.old_buf, 2, 3, false)[1])
+      assert.are.equal("three", vim.api.nvim_buf_get_lines(view.new_buf, 2, 3, false)[1])
     end)
 
     it("extends line highlights across the screen line", function()
@@ -192,11 +192,7 @@ describe("review diff view", function()
       assert.are.equal("▼ A —", vim.api.nvim_buf_get_lines(view.old_buf, 0, 1, false)[1])
       assert.are.equal("▼ A lua/added.lua", vim.api.nvim_buf_get_lines(view.new_buf, 0, 1, false)[1])
       local placeholder = vim.api.nvim_buf_get_lines(view.old_buf, 1, 2, false)[1]
-      local placeholder_prefix = "      │ "
-      local width = vim.api.nvim_win_get_width(view.old_win)
-      local remaining = width - vim.fn.strdisplaywidth(placeholder_prefix)
-      assert.are.equal(placeholder_prefix .. string.rep(" ", remaining), placeholder)
-      assert.are.equal(width, vim.fn.strdisplaywidth(placeholder))
+      assert.are.equal("", placeholder)
 
       local marks = vim.api.nvim_buf_get_extmarks(view.old_buf, render_ns, 0, -1, { details = true })
       local placeholder_details
@@ -209,7 +205,7 @@ describe("review diff view", function()
       assert.are.same("ReviewDiffChange", placeholder_details.hl_group)
       assert.is_true(placeholder_details.hl_eol)
 
-      assert.are.equal("    1 │ one", vim.api.nvim_buf_get_lines(view.new_buf, 1, 2, false)[1])
+      assert.are.equal("one", vim.api.nvim_buf_get_lines(view.new_buf, 1, 2, false)[1])
       assert.is_nil(view:resolve_location({ file = "lua/added.lua", side = "old", line = 1 }))
     end)
   end)

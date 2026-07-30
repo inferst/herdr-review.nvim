@@ -65,10 +65,9 @@ end
 ---@param end_row0 integer
 function M.write_rows(view, side, rows, start_row0, end_row0)
   local bufnr = view[side .. "_buf"]
-  local width = vim.api.nvim_win_get_width(view[side .. "_win"])
   local lines = {}
   for _, row in ipairs(rows) do
-    table.insert(lines, render.text(row, side, width, view.options))
+    table.insert(lines, render.text(row, side))
   end
 
   vim.api.nvim_buf_clear_namespace(bufnr, render_ns, start_row0, end_row0)
@@ -82,9 +81,6 @@ function M.write_rows(view, side, rows, start_row0, end_row0)
     local line_hl, inline = render.highlight(row, side, view.options)
     if line_hl then
       local col_start = 0
-      if row.display_kind == "line" then
-        col_start = render.source_prefix_width(row, side, view.options)
-      end
       if line_hl == "ReviewDiffAdd" or line_hl == "ReviewDiffDelete" or line_hl == "ReviewDiffChange" then
         vim.api.nvim_buf_set_extmark(bufnr, render_ns, row0, col_start, {
           end_row = row0 + 1,
@@ -145,10 +141,8 @@ function M.apply_syntax_for_file(view, file, range)
         local relative = side_index[span.line]
         if relative then
           local row_index = range.start + relative - 1
-          local row = view.display_rows[row_index]
-          local prefix_width = render.source_prefix_width(row, side, view.options)
-          local start_col = prefix_width + span.start_col
-          local end_col = prefix_width + span.end_col
+          local start_col = span.start_col
+          local end_col = span.end_col
           if end_col > start_col then
             vim.api.nvim_buf_set_extmark(bufnr, syntax_ns, row_index - 1, start_col, {
               end_row = row_index - 1,

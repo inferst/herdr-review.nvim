@@ -15,7 +15,6 @@ local DEFAULT_OPTIONS = {
   algorithm = "histogram",
   intra_line = false,
   collapse_on_open = false,
-  line_numbers = true,
   highlights = "default",
   syntax = {
     enabled = true,

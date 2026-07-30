@@ -17,7 +17,6 @@ M.highlights = "default"
 
 M.diff = {
   collapse_on_open = true,
-  line_numbers = true,
   show_hint = true,
 }
 
