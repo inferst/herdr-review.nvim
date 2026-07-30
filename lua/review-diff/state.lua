@@ -21,7 +21,7 @@ local function cursor_location_for_window(view, win)
   if not line or not path then
     return nil
   end
-  return { file = locations.normalize(path), side = side, line = line }
+  return { file = locations.normalize(path), side = side, line = line, col = cursor[2] }
 end
 
 local function cursor_anchor_for_window(view, win)
@@ -142,7 +142,7 @@ function M.restore(view, snapshot)
   row_index = row_index or header_index
   if row_index then
     view.last_side = cursor_side
-    view:set_cursor_row(row_index)
+    view:set_cursor_row(row_index, cursor.col)
     view.last_side = cursor_side
   end
 end

@@ -149,7 +149,7 @@ local function next_hunk_target_index(view, targets, direction)
   return #targets
 end
 
-function M.set_cursor_row(view, row_index)
+function M.set_cursor_row(view, row_index, col)
   if #view.display_rows == 0 then
     return
   end
@@ -159,11 +159,12 @@ function M.set_cursor_row(view, row_index)
   if current_side then
     view.last_side = current_side
   end
-  local current_cursor = layout.valid_window(current_win) and vim.api.nvim_win_get_cursor(current_win) or { 1, 0 }
+  local active_side = view.last_side
   for _, side in ipairs({ "old", "new" }) do
     local win = view[side .. "_win"]
     if layout.valid_window(win) then
-      vim.api.nvim_win_set_cursor(win, { row_index, math.min(current_cursor[2], 0) })
+      local win_col = (col and col > 0 and side == active_side) and col or 0
+      vim.api.nvim_win_set_cursor(win, { row_index, win_col })
     end
   end
   view:update_cursorline()

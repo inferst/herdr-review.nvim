@@ -345,8 +345,8 @@ function View:resolve_location(location, context, radius)
   return resolver.resolve_location(self.files, location, context, radius or self.state.context_lines)
 end
 
-function View:set_cursor_row(row_index)
-  navigation.set_cursor_row(self, row_index)
+function View:set_cursor_row(row_index, col)
+  navigation.set_cursor_row(self, row_index, col)
 end
 
 function View:toggle_file_at_cursor()
@@ -450,7 +450,7 @@ function View:open_source_at_cursor()
   vim.api.nvim_set_current_tabpage(self.origin.tabpage)
   vim.api.nvim_set_current_win(self.origin.win)
   vim.cmd("edit " .. vim.fn.fnameescape(path))
-  vim.api.nvim_win_set_cursor(self.origin.win, { location.line, 0 })
+  vim.api.nvim_win_set_cursor(self.origin.win, { location.line, location.col or 0 })
   return true, nil
 end
 
