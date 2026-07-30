@@ -98,6 +98,34 @@ describe("review session", function()
     assert.is_true(#vl >= 3)
   end)
 
+  it("keeps comment mutations and annotation refresh behind the session interface", function()
+    local comment = {
+      id = "comment-session-mutation",
+      file = "lua/init.lua",
+      side = "new",
+      line = 3,
+      text = "Review this line.",
+      created_at = "2026-07-26T00:00:00Z",
+    }
+
+    local added, add_err = session.add_comment("HEAD..WORKTREE", comment)
+
+    assert.is_nil(add_err)
+    assert.are.same(comment, added.comments[1])
+    assert.are.equal(1, #vim.api.nvim_buf_get_extmarks(view.new_buf, view.annotation_ns, 0, -1, {}))
+
+    local updated, update_err = session.update_comment("HEAD..WORKTREE", comment.id, { text = "Updated." })
+
+    assert.is_nil(update_err)
+    assert.are.equal("Updated.", updated.comments[1].text)
+
+    local deleted, delete_err = session.delete_comment("HEAD..WORKTREE", comment.id)
+
+    assert.is_nil(delete_err)
+    assert.are.same({}, deleted.comments)
+    assert.are.equal(0, #vim.api.nvim_buf_get_extmarks(view.new_buf, view.annotation_ns, 0, -1, {}))
+  end)
+
   it("does not place direct extmarks outside the buffer", function()
     session.place_extmark(view.new_buf, 100, "Out of range")
 

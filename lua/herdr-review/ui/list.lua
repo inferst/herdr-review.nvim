@@ -202,12 +202,11 @@ function M.open_list()
       return
     end
 
-    local data, err = storage.delete_comment(range, comment.id)
+    local data, err = session.delete_comment(range, comment.id)
     if not data then
       notify_storage_error(err)
       return
     end
-    session.load_session(range)
     render(nil, math.min(index, #loaded_comments - 1))
   end, { buffer = buf })
 

@@ -58,13 +58,13 @@ function M.create_comment()
     local data
     local err
     if existing_comment then
-      data, err = storage.update_comment(range, existing_comment.id, {
+      data, err = session.update_comment(range, existing_comment.id, {
         text = text,
         context = context,
         context_start = context_start,
       })
     else
-      data, err = storage.add_comment(range, {
+      data, err = session.add_comment(range, {
         id = storage.generate_id(),
         file = file,
         side = side,
@@ -82,7 +82,6 @@ function M.create_comment()
     end
 
     vim.notify(existing_comment and "Comment updated" or "Comment added", vim.log.levels.INFO)
-    session.load_session(range)
   end)
 end
 
@@ -111,14 +110,13 @@ function M.delete_comment_at_cursor()
     return
   end
 
-  local _, err = storage.delete_comment(range, existing.id)
+  local _, err = session.delete_comment(range, existing.id)
   if err then
     notify_storage_error(err)
     return
   end
 
   vim.notify("Comment deleted", vim.log.levels.INFO)
-  session.load_session(range)
 end
 
 ---@param range string
@@ -131,13 +129,12 @@ function M.edit_comment(range, comment, list_win, refresh)
       return
     end
 
-    local data, err = storage.update_comment(range, comment.id, { text = text })
+    local data, err = session.update_comment(range, comment.id, { text = text })
     if not data then
       notify_storage_error(err)
       return
     end
 
-    session.load_session(range)
     if refresh then
       refresh(comment.id)
     elseif vim.api.nvim_win_is_valid(list_win) then

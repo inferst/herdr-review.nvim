@@ -112,6 +112,40 @@ function M.load_session(range, view)
   return true
 end
 
+---@param range string
+---@param comment ReviewComment
+---@return table|nil, string|nil
+function M.add_comment(range, comment)
+  local data, err = storage.add_comment(range, comment)
+  if data then
+    M.load_session(range)
+  end
+  return data, err
+end
+
+---@param range string
+---@param id string
+---@param updates table
+---@return table|nil, string|nil
+function M.update_comment(range, id, updates)
+  local data, err = storage.update_comment(range, id, updates)
+  if data then
+    M.load_session(range)
+  end
+  return data, err
+end
+
+---@param range string
+---@param id string
+---@return table|nil, string|nil
+function M.delete_comment(range, id)
+  local data, err = storage.delete_comment(range, id)
+  if data then
+    M.load_session(range)
+  end
+  return data, err
+end
+
 ---@param view table|nil
 function M.on_view_opened(view)
   view = view or viewer.current()

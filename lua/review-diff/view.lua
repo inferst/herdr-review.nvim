@@ -2,6 +2,7 @@ local model = require("review-diff.model")
 local render = require("review-diff.render")
 local syntax = require("review-diff.syntax")
 local layout = require("review-diff.layout")
+local locations = require("review-diff.locations")
 local state_module = require("review-diff.state")
 local annotations = require("review-diff.annotations")
 local actions = require("review-diff.actions")
@@ -15,38 +16,6 @@ local M = {}
 
 local View = {}
 View.__index = View
-
-local function normalize_path(path)
-  if not path then
-    return nil
-  end
-  while path:sub(1, 2) == "./" do
-    path = path:sub(3)
-  end
-  return path:gsub("\\", "/")
-end
-
-local function same_path(left, right)
-  return normalize_path(left) == normalize_path(right)
-end
-
-local function file_for_location(files, location)
-  if not location or not location.file or not location.side then
-    return nil
-  end
-  for _, file in ipairs(files) do
-    local path
-    if location.side == "old" then
-      path = file.old_path
-    else
-      path = file.new_path
-    end
-    if same_path(path, location.file) then
-      return file
-    end
-  end
-  return nil
-end
 
 local function file_metadata(file)
   return {
@@ -74,10 +43,9 @@ local function context_result(lines, location, radius)
 end
 
 local function syntax_value(file, side)
-  if side == "old" then
-    return file.old_path, file.old_text
-  end
-  return file.new_path, file.new_text
+  local path = locations.path(file, side)
+  local text = side == "old" and file.old_text or file.new_text
+  return path, text
 end
 
 function M.new(fields)
@@ -369,7 +337,7 @@ function View:clear_annotations()
 end
 
 function View:location_row(location)
-  local file = file_for_location(self.files, location)
+  local file = locations.file_for(self.files, location)
   if not file or not location.line then
     return nil, nil
   end
@@ -406,7 +374,7 @@ function View:expand_source_row(file, source_index)
 end
 
 function View:expand_location(location)
-  local file = file_for_location(self.files, location)
+  local file = locations.file_for(self.files, location)
   if not file then
     return nil
   end
@@ -458,7 +426,7 @@ function View:get_cursor_location()
 end
 
 function View:get_context(location, radius)
-  local file = file_for_location(self.files, location)
+  local file = locations.file_for(self.files, location)
   if not file then
     return nil, "file not found"
   end
@@ -475,7 +443,7 @@ function View:get_context(location, radius)
 end
 
 function View:resolve_location(location, context, radius)
-  local file = file_for_location(self.files, location)
+  local file = locations.file_for(self.files, location)
   if not file then
     return nil
   end

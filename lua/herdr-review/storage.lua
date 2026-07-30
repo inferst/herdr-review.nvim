@@ -71,6 +71,23 @@ local function validate_session(range, data)
   return nil
 end
 
+---@param range string
+---@param mutate fun(data: table)
+---@return table|nil, string|nil
+local function mutate_session(range, mutate)
+  local data, load_err = M.load(range)
+  if not data then
+    return nil, load_err
+  end
+
+  mutate(data)
+  local ok, save_err = M.save(range, data)
+  if not ok then
+    return nil, save_err
+  end
+  return data, nil
+end
+
 ---@return string|nil, string|nil
 local function read_file(path)
   local file = Path:new(path)
@@ -152,17 +169,9 @@ end
 ---@param comment ReviewComment
 ---@return table|nil, string|nil
 function M.add_comment(range, comment)
-  local data, load_err = M.load(range)
-  if not data then
-    return nil, load_err
-  end
-
-  table.insert(data.comments, comment)
-  local ok, save_err = M.save(range, data)
-  if not ok then
-    return nil, save_err
-  end
-  return data, nil
+  return mutate_session(range, function(data)
+    table.insert(data.comments, comment)
+  end)
 end
 
 ---@param range string
@@ -170,48 +179,30 @@ end
 ---@param updates table
 ---@return table|nil, string|nil
 function M.update_comment(range, id, updates)
-  local data, load_err = M.load(range)
-  if not data then
-    return nil, load_err
-  end
-
-  for _, comment in ipairs(data.comments) do
-    if comment.id == id then
-      for key, value in pairs(updates) do
-        comment[key] = value
+  return mutate_session(range, function(data)
+    for _, comment in ipairs(data.comments) do
+      if comment.id == id then
+        for key, value in pairs(updates) do
+          comment[key] = value
+        end
+        break
       end
-      break
     end
-  end
-
-  local ok, save_err = M.save(range, data)
-  if not ok then
-    return nil, save_err
-  end
-  return data, nil
+  end)
 end
 
 ---@param range string
 ---@param id string
 ---@return table|nil, string|nil
 function M.delete_comment(range, id)
-  local data, load_err = M.load(range)
-  if not data then
-    return nil, load_err
-  end
-
-  for index, comment in ipairs(data.comments) do
-    if comment.id == id then
-      table.remove(data.comments, index)
-      break
+  return mutate_session(range, function(data)
+    for index, comment in ipairs(data.comments) do
+      if comment.id == id then
+        table.remove(data.comments, index)
+        break
+      end
     end
-  end
-
-  local ok, save_err = M.save(range, data)
-  if not ok then
-    return nil, save_err
-  end
-  return data, nil
+  end)
 end
 
 ---@param range string
