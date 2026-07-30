@@ -1,20 +1,15 @@
 local diff = require("herdr-review.diff")
 local herdr = require("herdr-review.herdr")
 local session = require("herdr-review.session")
-local storage = require("herdr-review.storage")
+local util = require("herdr-review.ui.util")
 
 local M = {}
-
-local function notify_storage_error(err)
-  vim.notify(err or "Could not access review session", vim.log.levels.ERROR)
-end
 
 ---@param range string
 ---@param agent HerdrAgent
 local function send_comments(range, agent)
-  local all_comments, storage_err = storage.get_comments(range)
+  local all_comments = util.load_comments(range)
   if not all_comments then
-    notify_storage_error(storage_err)
     return
   end
   if #all_comments == 0 then
@@ -70,7 +65,7 @@ function M.send_to_agent()
     return
   end
 
-  local project_root = view:repo_root()
+  local project_root = view:get_repo_root()
   if not project_root then
     vim.notify("Cannot determine project root", vim.log.levels.ERROR)
     return

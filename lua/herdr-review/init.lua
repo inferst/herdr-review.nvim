@@ -1,8 +1,8 @@
 local config = require("herdr-review.config")
 local ui = require("herdr-review.ui")
 local session = require("herdr-review.session")
-local spec_module = require("review-diff.spec")
-local git = require("review-diff.git")
+local spec_module = require("herdr-review.spec")
+local git = require("herdr-review.git")
 local viewer = require("review-diff")
 
 local M = {}

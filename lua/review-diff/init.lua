@@ -109,7 +109,7 @@ end
 ---@param input table
 ---@param opts table|nil
 ---@return table
-function M.open_resolved(input, opts)
+function M.open(input, opts)
   opts = vim.tbl_deep_extend("force", vim.deepcopy(DEFAULT_OPTIONS), M.options or {}, opts or {})
   set_default_highlights(opts)
   view_counter = view_counter + 1
@@ -166,8 +166,6 @@ function M.open_resolved(input, opts)
   view:emit("ready")
   return view
 end
-
-M.open = M.open_resolved
 
 function M.current()
   return active_view

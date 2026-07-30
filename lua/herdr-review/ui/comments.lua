@@ -3,23 +3,9 @@ local diff = require("herdr-review.diff")
 local paths = require("herdr-review.paths")
 local session = require("herdr-review.session")
 local storage = require("herdr-review.storage")
+local util = require("herdr-review.ui.util")
 
 local M = {}
-
-local function notify_storage_error(err)
-  vim.notify(err or "Could not access review session", vim.log.levels.ERROR)
-end
-
----@param range string
----@return ReviewComment[]|nil
-local function load_comments(range)
-  local stored, err = storage.get_comments(range)
-  if not stored then
-    notify_storage_error(err)
-    return nil
-  end
-  return stored
-end
 
 function M.create_comment()
   local view = diff.get_current_view()
@@ -36,7 +22,7 @@ function M.create_comment()
   end
 
   file = paths.normalize(file)
-  local stored = load_comments(range)
+  local stored = util.load_comments(range)
   if not stored then
     return
   end
@@ -58,13 +44,13 @@ function M.create_comment()
     local data
     local err
     if existing_comment then
-      data, err = storage.update_comment(range, existing_comment.id, {
+      data, err = session.update_comment(range, existing_comment.id, {
         text = text,
         context = context,
         context_start = context_start,
       })
     else
-      data, err = storage.add_comment(range, {
+      data, err = session.add_comment(range, {
         id = storage.generate_id(),
         file = file,
         side = side,
@@ -77,12 +63,11 @@ function M.create_comment()
     end
 
     if not data then
-      notify_storage_error(err)
+      util.notify_storage_error(err)
       return
     end
 
     vim.notify(existing_comment and "Comment updated" or "Comment added", vim.log.levels.INFO)
-    session.load_session(range)
   end)
 end
 
@@ -101,7 +86,7 @@ function M.delete_comment_at_cursor()
   end
 
   file = paths.normalize(file)
-  local stored = load_comments(range)
+  local stored = util.load_comments(range)
   if not stored then
     return
   end
@@ -111,14 +96,13 @@ function M.delete_comment_at_cursor()
     return
   end
 
-  local _, err = storage.delete_comment(range, existing.id)
+  local _, err = session.delete_comment(range, existing.id)
   if err then
-    notify_storage_error(err)
+    util.notify_storage_error(err)
     return
   end
 
   vim.notify("Comment deleted", vim.log.levels.INFO)
-  session.load_session(range)
 end
 
 ---@param range string
@@ -131,13 +115,12 @@ function M.edit_comment(range, comment, list_win, refresh)
       return
     end
 
-    local data, err = storage.update_comment(range, comment.id, { text = text })
+    local data, err = session.update_comment(range, comment.id, { text = text })
     if not data then
-      notify_storage_error(err)
+      util.notify_storage_error(err)
       return
     end
 
-    session.load_session(range)
     if refresh then
       refresh(comment.id)
     elseif vim.api.nvim_win_is_valid(list_win) then

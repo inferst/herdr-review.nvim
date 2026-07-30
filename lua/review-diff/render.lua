@@ -1,4 +1,6 @@
+local locations = require("review-diff.locations")
 local model = require("review-diff.model")
+local folds = require("review-diff.folds")
 
 local M = {}
 
@@ -77,19 +79,12 @@ local STATUS_LABELS = {
   binary = "B",
 }
 
-local function side_path(file, side)
-  if side == "old" then
-    return file.old_path
-  end
-  return file.new_path
-end
-
 local function path_label(file, side)
-  return side_path(file, side) or "—"
+  return locations.path(file, side) or "—"
 end
 
 local function fold_key(file, row)
-  return string.format("%s:%d:%d", file.id, row.first_row, row.last_row)
+  return folds.key(file.id, row.first_row, row.last_row)
 end
 
 ---@param files table[]

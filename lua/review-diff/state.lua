@@ -1,44 +1,7 @@
 local layout = require("review-diff.layout")
+local locations = require("review-diff.locations")
 
 local M = {}
-
-local function normalize_path(path)
-  if not path then
-    return nil
-  end
-  while path:sub(1, 2) == "./" do
-    path = path:sub(3)
-  end
-  return path:gsub("\\", "/")
-end
-
-local function location_path(file, side)
-  if side == "old" then
-    return file.old_path
-  end
-  return file.new_path
-end
-
-local function file_for_location(files, location)
-  if not location or not location.file or not location.side then
-    return nil
-  end
-  local function same_path(left, right)
-    return normalize_path(left) == normalize_path(right)
-  end
-  for _, file in ipairs(files) do
-    local path
-    if location.side == "old" then
-      path = file.old_path
-    else
-      path = file.new_path
-    end
-    if same_path(path, location.file) then
-      return file
-    end
-  end
-  return nil
-end
 
 local function cursor_location_for_window(view, win)
   if not layout.valid_window(win) then
@@ -54,11 +17,11 @@ local function cursor_location_for_window(view, win)
     return nil
   end
   local line = row.source_row[side .. "_line"]
-  local path = location_path(row.file, side)
+  local path = locations.path(row.file, side)
   if not line or not path then
     return nil
   end
-  return { file = normalize_path(path), side = side, line = line }
+  return { file = locations.normalize(path), side = side, line = line }
 end
 
 local function cursor_anchor_for_window(view, win)
@@ -75,11 +38,11 @@ local function cursor_anchor_for_window(view, win)
     return nil
   end
 
-  local path = location_path(row.file, side)
+  local path = locations.path(row.file, side)
   if not path then
     return nil
   end
-  local location = { file = normalize_path(path), side = side }
+  local location = { file = locations.normalize(path), side = side }
   if row.display_kind == "line" then
     location.line = row.source_row[side .. "_line"]
   elseif row.display_kind == "fold" then
@@ -143,7 +106,7 @@ function M.restore(view, snapshot)
 
   local cursor = snapshot.cursor
   local cursor_side = cursor and (cursor.side == "old" or cursor.side == "new") and cursor.side or nil
-  local cursor_file = cursor_side and file_for_location(view.files, cursor) or nil
+  local cursor_file = cursor_side and locations.file_for(view.files, cursor) or nil
   if cursor_file and cursor.line then
     view.state.collapsed_files[cursor_file.id] = false
   end

@@ -10,7 +10,7 @@ describe("review diff view", function()
   end)
 
   it("opens resolved input through the named public entrypoint", function()
-    view = viewer.open_resolved({
+    view = viewer.open({
       repo_root = vim.fn.getcwd(),
       review_id = "review-open-resolved",
       spec = { old = { kind = "ref", name = "HEAD" }, new = { kind = "worktree" } },
@@ -26,7 +26,7 @@ describe("review diff view", function()
       },
     }, { syntax = false })
 
-    assert.are.equal("review-open-resolved", view:id())
+    assert.are.equal("review-open-resolved", view:get_review_id())
     assert.are.equal("ready", view:status())
   end)
 
@@ -252,7 +252,7 @@ describe("review diff view", function()
 
     local metadata = view:metadata()
 
-    assert.are.equal("review-handle-metadata", view:id())
+    assert.are.equal("review-handle-metadata", view:get_review_id())
     assert.are.equal("review-handle-metadata", metadata.review_id)
     assert.are.equal("HEAD..WORKTREE", metadata.label)
     assert.are.equal(vim.fn.getcwd(), metadata.repo_root)

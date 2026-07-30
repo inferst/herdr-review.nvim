@@ -1,4 +1,4 @@
-local spec_module = require("review-diff.spec")
+local spec_module = require("herdr-review.spec")
 
 local M = {}
 
@@ -242,81 +242,104 @@ function M.resolve(spec, opts, callbacks)
   end
 
   local cwd = opts.cwd or vim.fn.getcwd()
-  run_git(job, cwd, { "rev-parse", "--show-toplevel" }, function(root_result)
-    if root_result.code ~= 0 then
-      if callbacks.on_error then
-        callbacks.on_error(error_message(root_result, "Not inside a Git repository"))
+  local ctx = {}
+
+  local function fail(message)
+    if callbacks.on_error then
+      callbacks.on_error(message)
+    end
+  end
+
+  -- The resolution runs as a sequence of async steps. Each step derives one
+  -- Git fact into `ctx` and calls the next; any failure funnels through `fail`.
+  -- Forward-declared so the steps read in execution order, top to bottom.
+  local resolve_root, resolve_old, resolve_new, resolve_compare_base, list_files, load_contents, deliver
+
+  function resolve_root()
+    run_git(job, cwd, { "rev-parse", "--show-toplevel" }, function(result)
+      if result.code ~= 0 then
+        return fail(error_message(result, "Not inside a Git repository"))
       end
+      ctx.root = vim.trim(result.stdout)
+      resolve_old()
+    end)
+  end
+
+  function resolve_old()
+    resolve_endpoint(job, ctx.root, spec.old, function(old_oid, err)
+      if err then
+        return fail(err)
+      end
+      ctx.old_oid = old_oid
+      resolve_new()
+    end)
+  end
+
+  function resolve_new()
+    resolve_endpoint(job, ctx.root, spec.new, function(new_oid, err)
+      if err then
+        return fail(err)
+      end
+      ctx.new_oid = new_oid
+      resolve_compare_base()
+    end)
+  end
+
+  function resolve_compare_base()
+    if spec.operator ~= "..." then
+      ctx.compare_old_oid = ctx.old_oid
+      return list_files()
+    end
+    run_git(job, ctx.root, { "merge-base", ctx.old_oid, ctx.new_oid }, function(result)
+      if result.code ~= 0 then
+        return fail(error_message(result, "Could not find merge-base"))
+      end
+      ctx.compare_old_oid = vim.trim(result.stdout)
+      list_files()
+    end)
+  end
+
+  function list_files()
+    resolve_files(job, ctx.root, spec, ctx.new_oid, ctx.compare_old_oid, function(files, err)
+      if err then
+        return fail(err)
+      end
+      ctx.files = files
+      load_contents()
+    end)
+  end
+
+  function load_contents()
+    load_file_contents(job, ctx.root, spec, ctx.compare_old_oid, ctx.new_oid, ctx.files, 1, function(files, err)
+      if err then
+        return fail(err)
+      end
+      ctx.files = files
+      deliver()
+    end)
+  end
+
+  function deliver()
+    if not callbacks.on_ready then
       return
     end
-    local root = vim.trim(root_result.stdout)
-    resolve_endpoint(job, root, spec.old, function(old_oid, old_error)
-      if old_error then
-        if callbacks.on_error then
-          callbacks.on_error(old_error)
-        end
-        return
-      end
-      resolve_endpoint(job, root, spec.new, function(new_oid, new_error)
-        if new_error then
-          if callbacks.on_error then
-            callbacks.on_error(new_error)
-          end
-          return
-        end
+    local target_id = spec.new.kind == "worktree" and "WORKTREE" or ctx.new_oid
+    callbacks.on_ready({
+      cwd = opts.cwd,
+      repo_root = ctx.root,
+      review_id = hash_parts({ ctx.root, spec.operator, ctx.compare_old_oid, target_id }),
+      label = spec_module.label(spec),
+      spec = vim.deepcopy(spec),
+      files = ctx.files,
+      resolved = {
+        old_oid = ctx.old_oid,
+        new_oid = ctx.new_oid,
+        compare_old_oid = ctx.compare_old_oid,
+      },
+    })
+  end
 
-        local function finish(compare_old_oid)
-          resolve_files(job, root, spec, new_oid, compare_old_oid, function(files, files_error)
-            if files_error then
-              if callbacks.on_error then
-                callbacks.on_error(files_error)
-              end
-              return
-            end
-            load_file_contents(job, root, spec, compare_old_oid, new_oid, files, 1, function(loaded_files, load_error)
-              if load_error then
-                if callbacks.on_error then
-                  callbacks.on_error(load_error)
-                end
-                return
-              end
-              local target_id = spec.new.kind == "worktree" and "WORKTREE" or new_oid
-              local review_id = hash_parts({ root, spec.operator, compare_old_oid, target_id })
-              if callbacks.on_ready then
-                callbacks.on_ready({
-                  cwd = opts.cwd,
-                  repo_root = root,
-                  review_id = review_id,
-                  label = spec_module.label(spec),
-                  spec = vim.deepcopy(spec),
-                  files = loaded_files,
-                  resolved = {
-                    old_oid = old_oid,
-                    new_oid = new_oid,
-                    compare_old_oid = compare_old_oid,
-                  },
-                })
-              end
-            end)
-          end)
-        end
-
-        if spec.operator ~= "..." then
-          finish(old_oid)
-          return
-        end
-        run_git(job, root, { "merge-base", old_oid, new_oid }, function(base_result)
-          if base_result.code ~= 0 then
-            if callbacks.on_error then
-              callbacks.on_error(error_message(base_result, "Could not find merge-base"))
-            end
-            return
-          end
-          finish(vim.trim(base_result.stdout))
-        end)
-      end)
-    end)
-  end)
+  resolve_root()
   return job
 end
 
