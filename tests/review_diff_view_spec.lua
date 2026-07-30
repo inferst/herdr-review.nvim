@@ -164,6 +164,9 @@ describe("review diff view", function()
         },
       })
 
+      -- Drain the async syntax queue so extmarks are applied before we read them
+      view:flush_syntax()
+
       local marks = vim.api.nvim_buf_get_extmarks(view.new_buf, syntax_ns, 0, -1, {})
       if parser_available then
         assert.is_true(#marks > 0)

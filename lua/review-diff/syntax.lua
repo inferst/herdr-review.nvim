@@ -83,6 +83,14 @@ function M.collect(path, text, opts)
     return {}
   end
 
+  local max_lines = opts.max_lines
+  if max_lines and max_lines > 0 then
+    local line_count = select(2, text:gsub("\n", "\n")) + 1
+    if line_count > max_lines then
+      return {}
+    end
+  end
+
   local language = language_for_path(path)
   if not language then
     return {}

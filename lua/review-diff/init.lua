@@ -19,6 +19,8 @@ local DEFAULT_OPTIONS = {
   syntax = {
     enabled = true,
     engine = "treesitter",
+    async = true,
+    max_lines = 5000,
   },
 }
 
@@ -101,6 +103,14 @@ local function setup_autocmds(view)
       if not view.closed and not view.rendering and vim.api.nvim_get_current_tabpage() == view.tabpage then
         vim.cmd("wincmd =")
         view:render()
+      end
+    end,
+  })
+  vim.api.nvim_create_autocmd("WinScrolled", {
+    group = group,
+    callback = function()
+      if not view.closed and vim.api.nvim_get_current_tabpage() == view.tabpage then
+        view:reprioritize_syntax()
       end
     end,
   })
