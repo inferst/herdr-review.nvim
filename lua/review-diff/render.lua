@@ -289,6 +289,7 @@ function M.highlight(row, side, opts)
         start = prefix_width + range.old_start,
         finish = prefix_width + range.old_end,
         hl_group = inline_hl,
+        line_text = line_text,
       }
   end
   return line_hl,
@@ -296,6 +297,7 @@ function M.highlight(row, side, opts)
       start = prefix_width + range.new_start,
       finish = prefix_width + range.new_end,
       hl_group = inline_hl,
+      line_text = line_text,
     }
 end
 
