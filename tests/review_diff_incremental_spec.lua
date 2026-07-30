@@ -188,6 +188,9 @@ describe("review diff incremental render", function()
       },
     }, { context_lines = 1 })
 
+    -- Drain the async syntax queue so extmarks are applied before we read them
+    view:flush_syntax()
+
     local range_a = view.file_row_ranges["lua/a.lua"]
     local marks_before =
       vim.api.nvim_buf_get_extmarks(view.new_buf, syntax_ns, range_a.start - 1, range_a.start - 1 + range_a.count - 1, {

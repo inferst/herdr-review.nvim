@@ -191,6 +191,18 @@ function View:apply_syntax()
   return syntax_layer.apply(self)
 end
 
+---Synchronously drains the async syntax queue, applying all pending
+---file highlights. Used in tests and when async = false.
+function View:flush_syntax()
+  return syntax_layer.flush(self)
+end
+
+---Reprioritizes the async syntax queue so visible files are highlighted first.
+---Call this on WinScrolled or similar navigation events.
+function View:reprioritize_syntax()
+  return syntax_layer.reprioritize(self)
+end
+
 function View:render()
   self.display_rows = render.display_rows(self.files, self.state)
   if self.hint_text then
