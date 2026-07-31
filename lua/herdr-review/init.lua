@@ -192,6 +192,7 @@ function M.setup(opts)
     algorithm = "histogram",
     intra_line = true,
     collapse_on_open = config.diff.collapse_on_open,
+    sticky_file_header = config.diff.sticky_file_header,
     highlights = opts.highlights or config.highlights,
     syntax = {
       enabled = true,

@@ -87,6 +87,7 @@ require("herdr-review").setup({
     context_lines = 3,
     ignore_whitespace = false,
     collapse_on_open = true,
+    sticky_file_header = true, -- set false to disable the sticky file header
     intra_line = true,
     max_file_bytes = 2 * 1024 * 1024,
     max_file_lines = 100000,
