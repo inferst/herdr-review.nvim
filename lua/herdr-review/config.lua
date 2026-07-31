@@ -16,6 +16,7 @@ M.highlights = "default"
 M.diff = {
   collapse_on_open = true,
   show_hint = true,
+  sticky_file_header = true,
 }
 
 return M

@@ -3,6 +3,7 @@ local layout = require("review-diff.layout")
 local annotations = require("review-diff.annotations")
 local actions = require("review-diff.actions")
 local view_module = require("review-diff.view")
+local sticky_header = require("review-diff.sticky_header")
 
 local M = {}
 
@@ -15,6 +16,7 @@ local DEFAULT_OPTIONS = {
   algorithm = "histogram",
   intra_line = false,
   collapse_on_open = false,
+  sticky_file_header = true,
   highlights = "default",
   syntax = {
     enabled = true,
@@ -95,6 +97,7 @@ local function setup_autocmds(view)
       if not view.closed and not view.rendering and vim.api.nvim_get_current_tabpage() == view.tabpage then
         vim.cmd("wincmd =")
         view:render_hint()
+        sticky_header.update(view)
       end
     end,
   })
@@ -103,22 +106,23 @@ local function setup_autocmds(view)
     callback = function()
       if not view.closed and vim.api.nvim_get_current_tabpage() == view.tabpage then
         view:reprioritize_syntax()
+        sticky_header.update(view)
+      end
+    end,
+  })
+  vim.api.nvim_create_autocmd("WinResized", {
+    group = group,
+    callback = function()
+      if not view.closed and vim.api.nvim_get_current_tabpage() == view.tabpage then
+        sticky_header.update(view)
       end
     end,
   })
   vim.api.nvim_create_autocmd("WinEnter", {
     group = group,
     callback = function()
-      if view.closed then
-        return
-      end
-      local current_win = vim.api.nvim_get_current_win()
-      local in_diff = view.win_sides[current_win] ~= nil
-      for _, side in ipairs({ "old", "new" }) do
-        local win = view[side .. "_win"]
-        if layout.valid_window(win) then
-          vim.api.nvim_set_option_value("scrollbind", in_diff, { scope = "local", win = win })
-        end
+      if not view.closed then
+        sticky_header.update(view)
       end
     end,
   })
@@ -178,6 +182,7 @@ function M.open(input, opts)
   active_view = view
   layout.open_tab(view)
   actions.setup_defaults(view, view.options.keymaps or DEFAULT_KEYMAPS)
+  sticky_header.attach(view)
   setup_autocmds(view)
   view:render()
   view:place_initial_cursor()
