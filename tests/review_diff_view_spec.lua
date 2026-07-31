@@ -52,7 +52,7 @@ describe("review diff view", function()
       assert.is_truthy(view)
       assert.is_false(vim.bo[view.old_buf].buflisted)
       assert.is_false(vim.bo[view.new_buf].buflisted)
-      assert.are.equal("▼ M lua/example.lua", vim.api.nvim_buf_get_lines(view.old_buf, 0, 1, false)[1])
+      assert.are.equal("▼ M lua/example.lua  +1 -1", vim.api.nvim_buf_get_lines(view.old_buf, 0, 1, false)[1])
       assert.are.equal("two", vim.api.nvim_buf_get_lines(view.old_buf, 2, 3, false)[1])
       assert.are.equal("three", vim.api.nvim_buf_get_lines(view.new_buf, 2, 3, false)[1])
     end)
@@ -192,8 +192,8 @@ describe("review diff view", function()
         },
       })
 
-      assert.are.equal("▼ A —", vim.api.nvim_buf_get_lines(view.old_buf, 0, 1, false)[1])
-      assert.are.equal("▼ A lua/added.lua", vim.api.nvim_buf_get_lines(view.new_buf, 0, 1, false)[1])
+      assert.are.equal("▼ A —  +2 -0", vim.api.nvim_buf_get_lines(view.old_buf, 0, 1, false)[1])
+      assert.are.equal("▼ A lua/added.lua  +2 -0", vim.api.nvim_buf_get_lines(view.new_buf, 0, 1, false)[1])
       local placeholder = vim.api.nvim_buf_get_lines(view.old_buf, 1, 2, false)[1]
       assert.are.equal("", placeholder)
 

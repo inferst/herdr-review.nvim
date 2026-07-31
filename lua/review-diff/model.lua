@@ -152,6 +152,7 @@ function M.build_file(file, opts)
   local diff = vim.text and vim.text.diff or vim.diff
   local hunks = diff(table.concat(old_lines, "\n"), table.concat(new_lines, "\n"), diff_opts)
   local old_cursor, new_cursor = 1, 1
+  local added, removed = 0, 0
 
   for _, hunk in ipairs(hunks) do
     local old_start = hunk_line_start(hunk[1], hunk[2])
@@ -163,9 +164,14 @@ function M.build_file(file, opts)
     local last_row = #result.rows
 
     table.insert(result.hunks, hunk_metadata(#result.hunks + 1, first_row, last_row, hunk))
+    added = added + hunk[4]
+    removed = removed + hunk[2]
   end
 
   append_context_rows(result.rows, old_lines, new_lines, old_cursor, new_cursor, #old_lines + 1, #new_lines + 1)
+  result.added_lines = added
+  result.removed_lines = removed
+
   return result
 end
 

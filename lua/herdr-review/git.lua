@@ -329,6 +329,8 @@ function M.resolve(spec, opts, callbacks)
       repo_root = ctx.root,
       review_id = hash_parts({ ctx.root, spec.operator, ctx.compare_old_oid, target_id }),
       label = spec_module.label(spec),
+      header_old = spec_module.header_side(spec.old),
+      header_new = spec_module.header_side(spec.new),
       spec = vim.deepcopy(spec),
       files = ctx.files,
       resolved = {

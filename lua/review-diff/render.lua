@@ -151,6 +151,9 @@ end
 ---@param side "old"|"new"
 ---@return string
 function M.text(row, side)
+  if row.display_kind == "diff_header" then
+    return side == "old" and (row.header_old or "") or (row.header_new or "")
+  end
   if row.display_kind == "hint" then
     return row.hint_text or ""
   end
@@ -160,7 +163,12 @@ function M.text(row, side)
   if row.display_kind == "file_header" then
     local marker = row.collapsed and "▶" or "▼"
     local status = STATUS_LABELS[row.file.status] or "M"
-    return string.format("%s %s %s", marker, status, path_label(row.file, side))
+    local header = string.format("%s %s %s", marker, status, path_label(row.file, side))
+    local file = row.file
+    if file.added_lines or file.removed_lines then
+      header = header .. string.format("  +%d -%d", file.added_lines or 0, file.removed_lines or 0)
+    end
+    return header
   end
   if row.display_kind == "metadata" then
     return "  " .. row.text
@@ -184,6 +192,13 @@ end
 ---@param opts table|nil
 ---@return string|nil, table|nil
 function M.highlight(row, side, opts)
+  if row.display_kind == "diff_header" then
+    local header_text = side == "old" and (row.header_old or "") or (row.header_new or "")
+    if header_text == "" then
+      return nil, nil
+    end
+    return "ReviewDiffFileHeader", nil
+  end
   if row.display_kind == "hint" then
     local hint_text = row.hint_text or ""
     if hint_text == "" then
@@ -192,7 +207,30 @@ function M.highlight(row, side, opts)
     return "ReviewDiffHint", nil
   end
   if row.display_kind == "file_header" then
-    return "ReviewDiffFileHeader", nil
+    local file = row.file
+    if not (file.added_lines or file.removed_lines) then
+      return "ReviewDiffFileHeader", nil
+    end
+    local marker = row.collapsed and "▶" or "▼"
+    local status = STATUS_LABELS[row.file.status] or "M"
+    local base = string.format("%s %s %s", marker, status, path_label(row.file, side))
+    local added_label = string.format("+%d", file.added_lines or 0)
+    local removed_label = string.format("-%d", file.removed_lines or 0)
+    local added_start = #base + 2
+    local removed_start = added_start + #added_label + 1
+    return "ReviewDiffFileHeader",
+      {
+        {
+          start = added_start,
+          finish = added_start + #added_label,
+          hl_group = "ReviewDiffAdd",
+        },
+        {
+          start = removed_start,
+          finish = removed_start + #removed_label,
+          hl_group = "ReviewDiffDelete",
+        },
+      }
   end
   if row.display_kind == "metadata" then
     return "ReviewDiffMetadata", nil

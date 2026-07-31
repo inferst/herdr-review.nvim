@@ -205,13 +205,27 @@ end
 
 function View:render()
   self.display_rows = render.display_rows(self.files, self.state)
+  local header_old = self.input.header_old
+  local header_new = self.input.header_new
+  if header_old and header_new and header_old ~= "" and header_new ~= "" then
+    table.insert(self.display_rows, 1, {
+      display_kind = "diff_header",
+      header_old = header_old,
+      header_new = header_new,
+    })
+    table.insert(self.display_rows, 2, { display_kind = "diff_header", header_old = "", header_new = "" })
+    self.header_row_count = 2
+  else
+    self.header_row_count = 0
+  end
   if self.hint_text then
     local width = vim.api.nvim_win_get_width(self.old_win)
     local hint_lines = render.wrap_hint_text(self.hint_text, width)
+    local offset = self.header_row_count
     for i = #hint_lines, 1, -1 do
-      table.insert(self.display_rows, 1, { display_kind = "hint", hint_text = hint_lines[i] })
+      table.insert(self.display_rows, 1 + offset, { display_kind = "hint", hint_text = hint_lines[i] })
     end
-    table.insert(self.display_rows, #hint_lines + 1, { display_kind = "hint", hint_text = "" })
+    table.insert(self.display_rows, #hint_lines + 1 + offset, { display_kind = "hint", hint_text = "" })
     self.hint_row_count = #hint_lines + 1
   else
     self.hint_row_count = 0
@@ -244,6 +258,7 @@ function View:render_hint()
     return
   end
   local old_count = self.hint_row_count or 0
+  local offset = self.header_row_count or 0
   local width = vim.api.nvim_win_get_width(self.old_win)
   local hint_lines = render.wrap_hint_text(self.hint_text, width)
   local new_count = #hint_lines + 1
@@ -255,10 +270,10 @@ function View:render_hint()
   table.insert(new_rows, new_count, { display_kind = "hint", hint_text = "" })
 
   for _ = 1, old_count do
-    table.remove(self.display_rows, 1)
+    table.remove(self.display_rows, 1 + offset)
   end
   for i, row in ipairs(new_rows) do
-    table.insert(self.display_rows, i, row)
+    table.insert(self.display_rows, offset + i, row)
   end
   self.hint_row_count = new_count
 
@@ -271,7 +286,7 @@ function View:render_hint()
 
   self.rendering = true
   for _, side in ipairs({ "old", "new" }) do
-    incremental.write_rows(self, side, new_rows, 0, old_count)
+    incremental.write_rows(self, side, new_rows, offset, offset + old_count)
   end
   self.rendering = false
 end

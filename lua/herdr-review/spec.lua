@@ -47,4 +47,20 @@ function M.label(spec)
   return name(spec.old) .. spec.operator .. name(spec.new)
 end
 
+local function short_name(side)
+  if side.kind == "worktree" then
+    return "Worktree"
+  end
+  if side.name and #side.name == 40 and side.name:match("^%x+$") then
+    return side.name:sub(1, 7)
+  end
+  return side.name
+end
+
+---@param name string
+---@return string header
+function M.header_side(name)
+  return "Review Diff: " .. short_name(name)
+end
+
 return M
