@@ -31,7 +31,7 @@ local function append_context(lines, comment)
     return
   end
 
-  local marker = comment.side == "old" and "-" or "+"
+  local marker = comment.side == "left" and "-" or "+"
   table.insert(lines, marker .. context_line)
 end
 
@@ -46,7 +46,7 @@ function M.build(_range, comments)
       table.insert(lines, "")
     end
 
-    local suffix = comment.side == "old" and " (removed)" or ""
+    local suffix = comment.side == "left" and " (removed)" or ""
     table.insert(lines, string.format("%s:%s%s", comment.file, comment.line, suffix))
     append_context(lines, comment)
     table.insert(lines, comment.text)

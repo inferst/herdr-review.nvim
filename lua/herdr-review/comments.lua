@@ -3,7 +3,7 @@ local M = {}
 ---@class ReviewComment
 ---@field id string
 ---@field file string
----@field side "old"|"new"
+---@field side "left"|"right"
 ---@field line integer
 ---@field text string
 ---@field context string|nil
@@ -18,8 +18,8 @@ local function comes_before(comment, other)
     return comment.file < other.file
   end
 
-  local comment_side = comment.side == "old" and 1 or 2
-  local other_side = other.side == "old" and 1 or 2
+  local comment_side = comment.side == "left" and 1 or 2
+  local other_side = other.side == "left" and 1 or 2
   if comment_side ~= other_side then
     return comment_side < other_side
   end
@@ -44,7 +44,7 @@ end
 
 ---@param comments ReviewComment[]
 ---@param file string
----@param side "old"|"new"
+---@param side "left"|"right"
 ---@param line integer
 ---@return ReviewComment|nil
 function M.find_at(comments, file, side, line)

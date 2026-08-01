@@ -28,11 +28,11 @@ local function async_enabled(options)
 end
 
 ---@param file table
----@param side "old"|"new"
+---@param side "left"|"right"
 ---@return string|nil path, string|nil text
 local function syntax_value(file, side)
   local path = locations.path(file, side)
-  local text = side == "old" and file.old_text or file.new_text
+  local text = side == "left" and file.left_text or file.right_text
   return path, text
 end
 
@@ -57,7 +57,7 @@ end
 ---Builds and caches syntax spans for a single file side.
 ---@param view table
 ---@param file table
----@param side "old"|"new"
+---@param side "left"|"right"
 local function ensure_cached(view, file, side)
   local path, text = syntax_value(file, side)
   if not path or not text or file.binary or file.too_large then
@@ -82,7 +82,7 @@ local function apply_file_syntax(view, file)
     return
   end
 
-  for _, side in ipairs({ "old", "new" }) do
+  for _, side in ipairs({ "left", "right" }) do
     ensure_cached(view, file, side)
   end
 
@@ -94,10 +94,10 @@ local function apply_file_syntax(view, file)
   end
 
   -- Clear namespace for this file's row range
-  vim.api.nvim_buf_clear_namespace(view.old_buf, syntax_ns, range.start - 1, range.start - 1 + range.count)
-  vim.api.nvim_buf_clear_namespace(view.new_buf, syntax_ns, range.start - 1, range.start - 1 + range.count)
+  vim.api.nvim_buf_clear_namespace(view.left_buf, syntax_ns, range.start - 1, range.start - 1 + range.count)
+  vim.api.nvim_buf_clear_namespace(view.right_buf, syntax_ns, range.start - 1, range.start - 1 + range.count)
 
-  for _, side in ipairs({ "old", "new" }) do
+  for _, side in ipairs({ "left", "right" }) do
     local bufnr = view[side .. "_buf"]
     local cached = cache[side]
     local side_index = file_index[side]
@@ -117,7 +117,7 @@ end
 ---@return table[]
 local function files_by_priority(view)
   local visible_ids = {}
-  for _, side in ipairs({ "old", "new" }) do
+  for _, side in ipairs({ "left", "right" }) do
     local win = view[side .. "_win"]
     if vim.api.nvim_win_is_valid(win) then
       local top = vim.fn.line("w0", win)
@@ -179,7 +179,7 @@ end
 ---highlighting. When async is disabled (or flush mode), runs synchronously.
 ---@param view table
 function M.apply(view)
-  for _, side in ipairs({ "old", "new" }) do
+  for _, side in ipairs({ "left", "right" }) do
     vim.api.nvim_buf_clear_namespace(view[side .. "_buf"], syntax_ns, 0, -1)
   end
 
@@ -210,8 +210,8 @@ end
 ---@param file table
 ---@param range table {start, count}
 function M.apply_for_file(view, file, range)
-  vim.api.nvim_buf_clear_namespace(view.old_buf, syntax_ns, range.start - 1, range.start - 1 + range.count)
-  vim.api.nvim_buf_clear_namespace(view.new_buf, syntax_ns, range.start - 1, range.start - 1 + range.count)
+  vim.api.nvim_buf_clear_namespace(view.left_buf, syntax_ns, range.start - 1, range.start - 1 + range.count)
+  vim.api.nvim_buf_clear_namespace(view.right_buf, syntax_ns, range.start - 1, range.start - 1 + range.count)
 
   if disabled(view.options) or file.binary or file.too_large then
     return
@@ -223,7 +223,7 @@ function M.apply_for_file(view, file, range)
     return
   end
 
-  for _, side in ipairs({ "old", "new" }) do
+  for _, side in ipairs({ "left", "right" }) do
     local bufnr = view[side .. "_buf"]
     local cached = cache[side]
     local side_index = file_index[side]
@@ -249,7 +249,7 @@ function M.flush(view)
   view._syntax_generation = (view._syntax_generation or 0) + 1
 
   -- Clear all syntax extmarks
-  for _, side in ipairs({ "old", "new" }) do
+  for _, side in ipairs({ "left", "right" }) do
     vim.api.nvim_buf_clear_namespace(view[side .. "_buf"], syntax_ns, 0, -1)
   end
 

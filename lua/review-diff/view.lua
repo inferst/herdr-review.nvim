@@ -22,8 +22,8 @@ View.__index = View
 local function file_metadata(file)
   return {
     id = file.id,
-    old_path = file.old_path,
-    new_path = file.new_path,
+    left_path = file.left_path,
+    right_path = file.right_path,
     status = file.status,
     binary = file.binary,
     too_large = file.too_large,
@@ -126,10 +126,10 @@ end
 
 function View:buffer_context(bufnr)
   local side
-  if bufnr == self.old_buf then
-    side = "old"
-  elseif bufnr == self.new_buf then
-    side = "new"
+  if bufnr == self.left_buf then
+    side = "left"
+  elseif bufnr == self.right_buf then
+    side = "right"
   end
   if not side then
     return nil, errors.result("not_review_buffer", "Buffer is not part of the review")
@@ -146,7 +146,7 @@ function View:resolve_anchor(anchor, opts)
     side = anchor and anchor.side,
     line = anchor and anchor.line,
   }
-  if not location.file or (location.side ~= "old" and location.side ~= "new") or not location.line then
+  if not location.file or (location.side ~= "left" and location.side ~= "right") or not location.line then
     return nil, errors.result("invalid_location", "Invalid review location")
   end
   local resolved = self:resolve_location(location, anchor.context, opts.radius or self:get_context_radius())
@@ -205,21 +205,21 @@ end
 
 function View:render()
   self.display_rows = render.display_rows(self.files, self.state)
-  local header_old = self.input.header_old
-  local header_new = self.input.header_new
-  if header_old and header_new and header_old ~= "" and header_new ~= "" then
+  local header_left = self.input.header_left
+  local header_right = self.input.header_right
+  if header_left and header_right and header_left ~= "" and header_right ~= "" then
     table.insert(self.display_rows, 1, {
       display_kind = "diff_header",
-      header_old = header_old,
-      header_new = header_new,
+      header_left = header_left,
+      header_right = header_right,
     })
-    table.insert(self.display_rows, 2, { display_kind = "diff_header", header_old = "", header_new = "" })
+    table.insert(self.display_rows, 2, { display_kind = "diff_header", header_left = "", header_right = "" })
     self.header_row_count = 2
   else
     self.header_row_count = 0
   end
   if self.hint_text then
-    local width = vim.api.nvim_win_get_width(self.old_win)
+    local width = vim.api.nvim_win_get_width(self.left_win)
     local hint_lines = render.wrap_hint_text(self.hint_text, width)
     local offset = self.header_row_count
     for i = #hint_lines, 1, -1 do
@@ -231,7 +231,7 @@ function View:render()
     self.hint_row_count = 0
   end
   self.rendering = true
-  for _, side in ipairs({ "old", "new" }) do
+  for _, side in ipairs({ "left", "right" }) do
     incremental.write_rows(self, side, self.display_rows, 0, -1)
   end
   self.rendering = false
@@ -259,7 +259,7 @@ function View:render_hint()
   end
   local old_count = self.hint_row_count or 0
   local offset = self.header_row_count or 0
-  local width = vim.api.nvim_win_get_width(self.old_win)
+  local width = vim.api.nvim_win_get_width(self.left_win)
   local hint_lines = render.wrap_hint_text(self.hint_text, width)
   local new_count = #hint_lines + 1
 
@@ -285,14 +285,14 @@ function View:render_hint()
   end
 
   self.rendering = true
-  for _, side in ipairs({ "old", "new" }) do
+  for _, side in ipairs({ "left", "right" }) do
     incremental.write_rows(self, side, new_rows, offset, offset + old_count)
   end
   self.rendering = false
 end
 
 function View:update_cursorline()
-  for _, side in ipairs({ "old", "new" }) do
+  for _, side in ipairs({ "left", "right" }) do
     local bufnr = self[side .. "_buf"]
     vim.api.nvim_buf_clear_namespace(bufnr, cursorline_ns, 0, -1)
 
@@ -361,7 +361,7 @@ function View:expand_location(location)
 end
 
 function View:open_location(location)
-  if not location or (location.side ~= "old" and location.side ~= "new") then
+  if not location or (location.side ~= "left" and location.side ~= "right") then
     return false, "invalid location"
   end
   if not self:expand_location(location) then
@@ -446,7 +446,7 @@ function View:sync_cursor()
   end
   self.syncing = true
   local row = vim.api.nvim_win_get_cursor(current_win)[1]
-  for _, other_side in ipairs({ "old", "new" }) do
+  for _, other_side in ipairs({ "left", "right" }) do
     local win = self[other_side .. "_win"]
     if layout.valid_window(win) and win ~= current_win then
       vim.api.nvim_win_set_cursor(win, { row, 0 })
@@ -466,7 +466,7 @@ end
 
 function View:map(mapping)
   self.keymaps[mapping.key] = mapping.action or mapping.desc or mapping.key
-  for _, side in ipairs({ "old", "new" }) do
+  for _, side in ipairs({ "left", "right" }) do
     vim.keymap.set("n", mapping.key, mapping.callback, {
       buffer = self[side .. "_buf"],
       desc = mapping.desc or mapping.action,
@@ -489,10 +489,10 @@ end
 
 function View:open_source_at_cursor()
   local location = self:get_cursor_location()
-  if not location or location.side ~= "new" then
+  if not location or location.side ~= "right" then
     return false, "no worktree file at cursor"
   end
-  if not self.input.spec or not self.input.spec.new or self.input.spec.new.kind ~= "worktree" then
+  if not self.input.spec or not self.input.spec.head or self.input.spec.head.kind ~= "worktree" then
     return false, "historical files are not opened from review"
   end
   if not layout.valid_tabpage(self.origin.tabpage) or not layout.valid_window(self.origin.win) then

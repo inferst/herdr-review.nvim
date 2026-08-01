@@ -56,7 +56,7 @@ Remote refs are resolved locally. The command does not fetch automatically.
 | Key | Action |
 |-----|--------|
 | `<Tab>` | Collapse/expand the file group under the cursor |
-| `<CR>` | Open the new worktree file in the originating tab/window |
+| `<CR>` | Open the worktree file in the originating tab/window |
 | `]f` / `[f` | Next/previous file |
 | `]c` / `[c` | Next/previous hunk |
 | `za` | Toggle a context fold |
@@ -65,7 +65,7 @@ Remote refs are resolved locally. The command does not fetch automatically.
 | `?` | Show review keymaps |
 | `q` | Close the review tab |
 
-Old-side and historical new-side `<CR>` targets are intentionally not opened in an ordinary buffer. Comment-list jumps can focus either side inside the review tab.
+Left-side and historical right-side `<CR>` targets are intentionally not opened in an ordinary buffer. Comment-list jumps can focus either side inside the review tab.
 
 ### Comment keybindings
 
@@ -137,7 +137,7 @@ review:sync_annotations({
     id = "comment-1",
     anchor = {
       file = "lua/init.lua",
-      side = "new",
+      side = "right",
       line = 12,
       context = "nearby\nsource\nlines",
     },
@@ -145,14 +145,14 @@ review:sync_annotations({
   },
 })
 
-review:open_location({ file = "lua/init.lua", side = "new", line = 12 })
+review:open_location({ file = "lua/init.lua", side = "right", line = 12 })
 ```
 
 The viewer exposes review identity, metadata, source locations, source context, anchor resolution, lifecycle events, annotations, and action registration. It owns no comment persistence or herdr-specific behaviour. Buffers, windows, display rows, extmarks, fold keys, and state snapshots are implementation details.
 
 ## Storage
 
-Comments are stored under `stdpath("data") .. "/herdr-review/sessions"` using schema version 3. The session key includes the repository root and resolved Git object IDs.
+Comments are stored under `stdpath("data") .. "/herdr-review/sessions"` using schema version 4. The session key includes the repository root and resolved Git object IDs.
 
 ## Development
 

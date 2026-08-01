@@ -105,7 +105,7 @@ function M.restore(view, snapshot)
   view.state.expanded_folds = vim.deepcopy(snapshot.expanded_folds or {})
 
   local cursor = snapshot.cursor
-  local cursor_side = cursor and (cursor.side == "old" or cursor.side == "new") and cursor.side or nil
+  local cursor_side = cursor and (cursor.side == "left" or cursor.side == "right") and cursor.side or nil
   local cursor_file = cursor_side and locations.file_for(view.files, cursor) or nil
   if cursor_file and cursor.line then
     view.state.collapsed_files[cursor_file.id] = false

@@ -12,18 +12,18 @@ describe("review storage", function()
     vim.fn.delete(data_dir, "rf")
   end)
 
-  it("starts a new v3 session when no file exists", function()
+  it("starts a new v4 session when no file exists", function()
     local data, err = storage.load("HEAD..WORKDIR")
 
     assert.is_nil(err)
-    assert.are.same({ version = 3, review_id = "HEAD..WORKDIR", comments = {} }, data)
+    assert.are.same({ version = 4, review_id = "HEAD..WORKDIR", comments = {} }, data)
   end)
 
   it("supports comment CRUD", function()
     local comment = {
       id = "comment-1",
       file = "lua/init.lua",
-      side = "new",
+      side = "right",
       line = 10,
       text = "Extract this block.",
       context = "local value = true",
@@ -47,7 +47,7 @@ describe("review storage", function()
 
   it("reports malformed session data without replacing it", function()
     local range = "HEAD..WORKDIR"
-    local _, save_err = storage.save(range, { version = 3, review_id = range, comments = {} })
+    local _, save_err = storage.save(range, { version = 4, review_id = range, comments = {} })
     assert.is_nil(save_err)
 
     local session_file = vim.fn.glob(data_dir .. "/sessions/*.json")

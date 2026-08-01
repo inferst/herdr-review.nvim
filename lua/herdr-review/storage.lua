@@ -3,7 +3,7 @@ local config = require("herdr-review.config")
 
 local M = {}
 
-local VERSION = 3
+local VERSION = 4
 local id_counter = 0
 
 ---@param range string
@@ -31,7 +31,7 @@ local function validate_comment(comment, index)
   if type(comment.file) ~= "string" or comment.file == "" then
     return string.format("comment %d has no file", index)
   end
-  if comment.side ~= "old" and comment.side ~= "new" then
+  if comment.side ~= "left" and comment.side ~= "right" then
     return string.format("comment %d has an invalid side", index)
   end
   if type(comment.line) ~= "number" or comment.line < 1 then

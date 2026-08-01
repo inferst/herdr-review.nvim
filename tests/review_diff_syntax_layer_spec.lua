@@ -13,22 +13,22 @@ describe("review diff syntax layer async", function()
     return {
       repo_root = vim.fn.getcwd(),
       review_id = review_id,
-      spec = { old = { kind = "ref", name = "HEAD" }, new = { kind = "worktree" } },
+      spec = { base = { kind = "ref", name = "HEAD" }, head = { kind = "worktree" } },
       files = {
         {
           id = "lua/a.lua",
-          old_path = "lua/a.lua",
-          new_path = "lua/a.lua",
-          old_text = "local a = 1\nlocal b = 2",
-          new_text = "local a = 1\nlocal b = 20",
+          left_path = "lua/a.lua",
+          right_path = "lua/a.lua",
+          left_text = "local a = 1\nlocal b = 2",
+          right_text = "local a = 1\nlocal b = 20",
           status = "modified",
         },
         {
           id = "lua/b.lua",
-          old_path = "lua/b.lua",
-          new_path = "lua/b.lua",
-          old_text = "local x = 10\nlocal y = 20",
-          new_text = "local x = 10\nlocal y = 200",
+          left_path = "lua/b.lua",
+          right_path = "lua/b.lua",
+          left_text = "local x = 10\nlocal y = 20",
+          right_text = "local x = 10\nlocal y = 200",
           status = "modified",
         },
       },
@@ -48,7 +48,7 @@ describe("review diff syntax layer async", function()
     -- After flush, all files must have extmarks
     view:flush_syntax()
 
-    local marks = vim.api.nvim_buf_get_extmarks(view.new_buf, syntax_ns, 0, -1, {})
+    local marks = vim.api.nvim_buf_get_extmarks(view.right_buf, syntax_ns, 0, -1, {})
     assert.is_true(#marks > 0, "expected syntax extmarks after flush_syntax")
   end)
 
@@ -83,7 +83,7 @@ describe("review diff syntax layer async", function()
     })
 
     -- With max_lines=1, all 2-line files are skipped, so no extmarks
-    local marks = vim.api.nvim_buf_get_extmarks(view.new_buf, syntax_ns, 0, -1, {})
+    local marks = vim.api.nvim_buf_get_extmarks(view.right_buf, syntax_ns, 0, -1, {})
     assert.are.equal(0, #marks, "expected no extmarks when all files exceed max_lines")
   end)
 
@@ -100,7 +100,7 @@ describe("review diff syntax layer async", function()
     })
 
     -- With async=false highlights are applied in render(), no flush needed
-    local marks = vim.api.nvim_buf_get_extmarks(view.new_buf, syntax_ns, 0, -1, {})
+    local marks = vim.api.nvim_buf_get_extmarks(view.right_buf, syntax_ns, 0, -1, {})
     assert.is_true(#marks > 0, "expected syntax extmarks when async = false")
   end)
 end)

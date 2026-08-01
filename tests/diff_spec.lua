@@ -14,14 +14,14 @@ describe("review diff adapter", function()
     view = viewer.open({
       repo_root = vim.fn.getcwd(),
       review_id = "adapter-1",
-      spec = { old = { kind = "ref", name = "HEAD" }, new = { kind = "worktree" } },
+      spec = { base = { kind = "ref", name = "HEAD" }, head = { kind = "worktree" } },
       files = {
         {
           id = "lua/new.lua",
-          old_path = "lua/old.lua",
-          new_path = "lua/new.lua",
-          old_text = "old",
-          new_text = "new",
+          left_path = "lua/old.lua",
+          right_path = "lua/new.lua",
+          left_text = "old",
+          right_text = "new",
           status = "renamed",
         },
       },
@@ -29,13 +29,13 @@ describe("review diff adapter", function()
 
     local file, side, line = diff.get_cursor_context()
     assert.are.equal("lua/new.lua", file)
-    assert.are.equal("new", side)
+    assert.are.equal("right", side)
     assert.are.equal(1, line)
 
-    vim.api.nvim_set_current_win(view.old_win)
+    vim.api.nvim_set_current_win(view.left_win)
     file, side, line = diff.get_cursor_context()
     assert.are.equal("lua/old.lua", file)
-    assert.are.equal("old", side)
+    assert.are.equal("left", side)
     assert.are.equal(1, line)
   end)
 end)

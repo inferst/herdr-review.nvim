@@ -13,13 +13,13 @@ function M.normalize(path)
 end
 
 ---@param file table
----@param side "old"|"new"
+---@param side "left"|"right"
 ---@return string|nil
 function M.path(file, side)
-  if side == "old" then
-    return file.old_path
+  if side == "left" then
+    return file.left_path
   end
-  return file.new_path
+  return file.right_path
 end
 
 ---@param files table[]

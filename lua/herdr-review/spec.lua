@@ -15,46 +15,46 @@ function M.parse(args)
   if not value or value == "" then
     return {
       operator = "..",
-      old = endpoint("HEAD"),
-      new = endpoint("WORKTREE"),
+      base = endpoint("HEAD"),
+      head = endpoint("WORKTREE"),
     }
   end
 
-  local old, _, new = value:match("^(.-)(%.%.%.)(.-)$")
-  if old and new and old ~= "" and new ~= "" then
-    return { operator = "...", old = endpoint(old), new = endpoint(new) }
+  local base, _, head = value:match("^(.-)(%.%.%.)(.-)$")
+  if base and head and base ~= "" and head ~= "" then
+    return { operator = "...", base = endpoint(base), head = endpoint(head) }
   end
 
-  old, _, new = value:match("^(.-)(%.%.)(.-)$")
-  if old and new and old ~= "" and new ~= "" then
-    return { operator = "..", old = endpoint(old), new = endpoint(new) }
+  base, _, head = value:match("^(.-)(%.%.)(.-)$")
+  if base and head and base ~= "" and head ~= "" then
+    return { operator = "..", base = endpoint(base), head = endpoint(head) }
   end
 
   return {
     operator = "..",
-    old = endpoint(value),
-    new = endpoint("WORKTREE"),
+    base = endpoint(value),
+    head = endpoint("WORKTREE"),
   }
 end
 
 ---@param spec table
 ---@return string
 function M.label(spec)
-  local function name(side)
-    return side.kind == "worktree" and "WORKTREE" or side.name
+  local function name(point)
+    return point.kind == "worktree" and "WORKTREE" or point.name
   end
 
-  return name(spec.old) .. spec.operator .. name(spec.new)
+  return name(spec.base) .. spec.operator .. name(spec.head)
 end
 
-local function short_name(side)
-  if side.kind == "worktree" then
+local function short_name(point)
+  if point.kind == "worktree" then
     return "Worktree"
   end
-  if side.name and #side.name == 40 and side.name:match("^%x+$") then
-    return side.name:sub(1, 7)
+  if point.name and #point.name == 40 and point.name:match("^%x+$") then
+    return point.name:sub(1, 7)
   end
-  return side.name
+  return point.name
 end
 
 ---@param name string

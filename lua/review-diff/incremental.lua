@@ -10,15 +10,15 @@ local render_ns = vim.api.nvim_create_namespace("review-diff-render")
 ---@param rows table[]
 ---@return table
 function M.build_file_index(rows)
-  local index = { old = {}, new = {} }
+  local index = { left = {}, right = {} }
   for offset, row in ipairs(rows) do
     if row.display_kind == "line" then
       local source_row = row.source_row
-      if source_row.old_line then
-        index.old[source_row.old_line] = offset
+      if source_row.left_line then
+        index.left[source_row.left_line] = offset
       end
-      if source_row.new_line then
-        index.new[source_row.new_line] = offset
+      if source_row.right_line then
+        index.right[source_row.right_line] = offset
       end
     end
   end
@@ -59,7 +59,7 @@ end
 ---`end_row0 = -1` meaning "to the end of the buffer"), replacing whatever was
 ---there before, and re-applies the base highlight extmarks for those rows.
 ---@param view table
----@param side "old"|"new"
+---@param side "left"|"right"
 ---@param rows table[]
 ---@param start_row0 integer
 ---@param end_row0 integer
@@ -141,7 +141,7 @@ function M.render_file(view, file)
   end
 
   view.rendering = true
-  for _, side in ipairs({ "old", "new" }) do
+  for _, side in ipairs({ "left", "right" }) do
     M.write_rows(view, side, new_rows, range.start - 1, range.start - 1 + old_count)
   end
   view.rendering = false
