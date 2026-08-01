@@ -68,3 +68,19 @@ example `fix: normalize diff paths` or `feat: add comment filtering`. Keep
 commits focused. Pull requests should explain user-visible behavior, list
 manual verification steps, link the relevant issue when one exists, and
 include screenshots or recordings for floating-window or UI changes.
+
+## Agent skills
+
+### Issue tracker
+
+Issues and PRDs are tracked in GitHub Issues. See
+`docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Use the standard triage label vocabulary. See
+`docs/agents/triage-labels.md`.
+
+### Domain docs
+
+This is a single-context repository. See `docs/agents/domain.md`.
