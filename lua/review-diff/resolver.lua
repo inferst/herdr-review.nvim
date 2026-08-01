@@ -13,7 +13,7 @@ function M.get_context(files, location, radius)
   if not file then
     return nil, "file not found"
   end
-  local lines = location.side == "old" and file.old_lines or file.new_lines
+  local lines = location.side == "left" and file.left_lines or file.right_lines
   if not location.line or not lines[location.line] then
     return nil, "location is stale"
   end
@@ -35,7 +35,7 @@ function M.resolve_location(files, location, context, radius)
   if not file then
     return nil
   end
-  local lines = location.side == "old" and file.old_lines or file.new_lines
+  local lines = location.side == "left" and file.left_lines or file.right_lines
   if not context or context == "" then
     return lines[location.line] and vim.deepcopy(location) or nil
   end

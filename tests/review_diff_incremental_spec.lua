@@ -13,22 +13,22 @@ describe("review diff incremental render", function()
     return {
       repo_root = vim.fn.getcwd(),
       review_id = review_id,
-      spec = { old = { kind = "ref", name = "HEAD" }, new = { kind = "worktree" } },
+      spec = { base = { kind = "ref", name = "HEAD" }, head = { kind = "worktree" } },
       files = {
         {
           id = "lua/a.lua",
-          old_path = "lua/a.lua",
-          new_path = "lua/a.lua",
-          old_text = "one\ntwo\nthree\nfour\nfive\nsix\nseven\neight",
-          new_text = "one\ntwo\nTHREE\nfour\nfive\nsix\nseven\neight",
+          left_path = "lua/a.lua",
+          right_path = "lua/a.lua",
+          left_text = "one\ntwo\nthree\nfour\nfive\nsix\nseven\neight",
+          right_text = "one\ntwo\nTHREE\nfour\nfive\nsix\nseven\neight",
           status = "modified",
         },
         {
           id = "lua/b.lua",
-          old_path = "lua/b.lua",
-          new_path = "lua/b.lua",
-          old_text = "one\ntwo\nthree\nfour\nfive\nsix\nseven\neight",
-          new_text = "one\ntwo\nTHREE\nfour\nfive\nsix\nseven\neight",
+          left_path = "lua/b.lua",
+          right_path = "lua/b.lua",
+          left_text = "one\ntwo\nthree\nfour\nfive\nsix\nseven\neight",
+          right_text = "one\ntwo\nTHREE\nfour\nfive\nsix\nseven\neight",
           status = "modified",
         },
       },
@@ -48,8 +48,8 @@ describe("review diff incremental render", function()
     local index = fold_row_index(current_view, file_id, min_count)
     assert.is_truthy(index, "expected a fold row for " .. file_id)
     vim.api.nvim_set_current_tabpage(current_view.tabpage)
-    vim.api.nvim_set_current_win(current_view.old_win)
-    vim.api.nvim_win_set_cursor(current_view.old_win, { index, 0 })
+    vim.api.nvim_set_current_win(current_view.left_win)
+    vim.api.nvim_win_set_cursor(current_view.left_win, { index, 0 })
     current_view:toggle_fold_at_cursor()
   end
 
@@ -62,23 +62,23 @@ describe("review diff incremental render", function()
     view = viewer.open(three_file_input("incremental-earlier-untouched"), { context_lines = 1, syntax = false })
 
     local range_a_before = vim.deepcopy(view.file_row_ranges["lua/a.lua"])
-    local old_lines_before = buffer_lines(view, "old", range_a_before)
-    local new_lines_before = buffer_lines(view, "new", range_a_before)
+    local left_lines_before = buffer_lines(view, "left", range_a_before)
+    local right_lines_before = buffer_lines(view, "right", range_a_before)
 
     toggle_fold_in(view, "lua/b.lua")
 
     local range_a_after = view.file_row_ranges["lua/a.lua"]
     assert.are.same(range_a_before, range_a_after)
-    assert.are.same(old_lines_before, buffer_lines(view, "old", range_a_after))
-    assert.are.same(new_lines_before, buffer_lines(view, "new", range_a_after))
+    assert.are.same(left_lines_before, buffer_lines(view, "left", range_a_after))
+    assert.are.same(right_lines_before, buffer_lines(view, "right", range_a_after))
   end)
 
   it("shifts a later file's range by the exact row-count delta when an earlier file's fold toggles", function()
     view = viewer.open(three_file_input("incremental-later-shifts"), { context_lines = 1, syntax = false })
 
     local range_b_before = vim.deepcopy(view.file_row_ranges["lua/b.lua"])
-    local old_lines_before = buffer_lines(view, "old", range_b_before)
-    local new_lines_before = buffer_lines(view, "new", range_b_before)
+    local left_lines_before = buffer_lines(view, "left", range_b_before)
+    local right_lines_before = buffer_lines(view, "right", range_b_before)
     local count_a_before = view.file_row_ranges["lua/a.lua"].count
 
     toggle_fold_in(view, "lua/a.lua", 2)
@@ -90,8 +90,8 @@ describe("review diff incremental render", function()
     local range_b_after = view.file_row_ranges["lua/b.lua"]
     assert.are.equal(range_b_before.start + delta, range_b_after.start)
     assert.are.equal(range_b_before.count, range_b_after.count)
-    assert.are.same(old_lines_before, buffer_lines(view, "old", range_b_after))
-    assert.are.same(new_lines_before, buffer_lines(view, "new", range_b_after))
+    assert.are.same(left_lines_before, buffer_lines(view, "left", range_b_after))
+    assert.are.same(right_lines_before, buffer_lines(view, "right", range_b_after))
   end)
 
   it("keeps location_row resolving correctly for a file after another file's fold toggles", function()
@@ -99,10 +99,10 @@ describe("review diff incremental render", function()
 
     toggle_fold_in(view, "lua/a.lua")
 
-    local row_index, row = view:location_row({ file = "lua/b.lua", side = "new", line = 3 })
+    local row_index, row = view:location_row({ file = "lua/b.lua", side = "right", line = 3 })
     assert.is_truthy(row_index)
     assert.are.equal("line", row.display_kind)
-    assert.are.equal(3, row.source_row.new_line)
+    assert.are.equal(3, row.source_row.right_line)
     assert.are.equal("lua/b.lua", row.file_id)
   end)
 
@@ -119,8 +119,8 @@ describe("review diff incremental render", function()
         end
       end
       assert.is_truthy(index, "expected a file header row for " .. fid)
-      vim.api.nvim_set_current_win(view.old_win)
-      vim.api.nvim_win_set_cursor(view.old_win, { index, 0 })
+      vim.api.nvim_set_current_win(view.left_win)
+      vim.api.nvim_win_set_cursor(view.left_win, { index, 0 })
       view:toggle_file_at_cursor()
     end
 
@@ -132,7 +132,7 @@ describe("review diff incremental render", function()
     assert.are.equal(1, range_a.count)
     local function header_mark()
       local marks = vim.api.nvim_buf_get_extmarks(
-        view.new_buf,
+        view.right_buf,
         render_ns,
         { range_a.start - 1, 0 },
         { range_a.start - 1, -1 },
@@ -167,22 +167,22 @@ describe("review diff incremental render", function()
     view = viewer.open({
       repo_root = vim.fn.getcwd(),
       review_id = "incremental-syntax-untouched",
-      spec = { old = { kind = "ref", name = "HEAD" }, new = { kind = "worktree" } },
+      spec = { base = { kind = "ref", name = "HEAD" }, head = { kind = "worktree" } },
       files = {
         {
           id = "lua/a.lua",
-          old_path = "lua/a.lua",
-          new_path = "lua/a.lua",
-          old_text = "local a = 1\nlocal b = 2\nlocal c = 3",
-          new_text = "local a = 1\nlocal b = 20\nlocal c = 3",
+          left_path = "lua/a.lua",
+          right_path = "lua/a.lua",
+          left_text = "local a = 1\nlocal b = 2\nlocal c = 3",
+          right_text = "local a = 1\nlocal b = 20\nlocal c = 3",
           status = "modified",
         },
         {
           id = "lua/b.lua",
-          old_path = "lua/b.lua",
-          new_path = "lua/b.lua",
-          old_text = "one\ntwo\nthree\nfour\nfive\nsix\nseven\neight",
-          new_text = "one\ntwo\nTHREE\nfour\nfive\nsix\nseven\neight",
+          left_path = "lua/b.lua",
+          right_path = "lua/b.lua",
+          left_text = "one\ntwo\nthree\nfour\nfive\nsix\nseven\neight",
+          right_text = "one\ntwo\nTHREE\nfour\nfive\nsix\nseven\neight",
           status = "modified",
         },
       },
@@ -192,17 +192,27 @@ describe("review diff incremental render", function()
     view:flush_syntax()
 
     local range_a = view.file_row_ranges["lua/a.lua"]
-    local marks_before =
-      vim.api.nvim_buf_get_extmarks(view.new_buf, syntax_ns, range_a.start - 1, range_a.start - 1 + range_a.count - 1, {
+    local marks_before = vim.api.nvim_buf_get_extmarks(
+      view.right_buf,
+      syntax_ns,
+      range_a.start - 1,
+      range_a.start - 1 + range_a.count - 1,
+      {
         details = true,
-      })
+      }
+    )
 
     toggle_fold_in(view, "lua/b.lua")
 
-    local marks_after =
-      vim.api.nvim_buf_get_extmarks(view.new_buf, syntax_ns, range_a.start - 1, range_a.start - 1 + range_a.count - 1, {
+    local marks_after = vim.api.nvim_buf_get_extmarks(
+      view.right_buf,
+      syntax_ns,
+      range_a.start - 1,
+      range_a.start - 1 + range_a.count - 1,
+      {
         details = true,
-      })
+      }
+    )
 
     assert.are.same(marks_before, marks_after)
   end)

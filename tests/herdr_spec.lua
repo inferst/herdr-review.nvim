@@ -5,7 +5,7 @@ describe("herdr prompt", function()
     local prompt = herdr.build_prompt("HEAD..WORKDIR", {
       {
         file = "crates/plugin/src/runtime.rs",
-        side = "old",
+        side = "left",
         line = 109,
         text = "Test comment 1",
         context = table.concat({
@@ -20,7 +20,7 @@ describe("herdr prompt", function()
       },
       {
         file = "crates/plugin/src/runtime.rs",
-        side = "new",
+        side = "right",
         line = 118,
         text = "Test comment 2",
         context = table.concat({

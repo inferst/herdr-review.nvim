@@ -10,7 +10,7 @@ end
 
 function M.apply(view)
   local result = { applied = {}, stale = {} }
-  for _, side in ipairs({ "old", "new" }) do
+  for _, side in ipairs({ "left", "right" }) do
     vim.api.nvim_buf_clear_namespace(view[side .. "_buf"], annotation_ns, 0, -1)
   end
 
@@ -28,7 +28,7 @@ function M.apply(view)
           virt_lines_above = false,
         })
 
-        local other_side = side == "old" and "new" or "old"
+        local other_side = side == "left" and "right" or "left"
         local other_bufnr = view[other_side .. "_buf"]
         local empty = {}
         for _ = 1, #lines do
@@ -86,7 +86,7 @@ end
 function M.clear(view)
   view.annotations = {}
   view.annotation_order = {}
-  for _, side in ipairs({ "old", "new" }) do
+  for _, side in ipairs({ "left", "right" }) do
     vim.api.nvim_buf_clear_namespace(view[side .. "_buf"], annotation_ns, 0, -1)
   end
 end

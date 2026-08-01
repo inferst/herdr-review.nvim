@@ -68,7 +68,7 @@ end
 local function setup_autocmds(view)
   local group = vim.api.nvim_create_augroup("ReviewDiff" .. view.uid, { clear = true })
   view.autocmd_group = group
-  for _, side in ipairs({ "old", "new" }) do
+  for _, side in ipairs({ "left", "right" }) do
     vim.api.nvim_create_autocmd("CursorMoved", {
       group = group,
       buffer = view[side .. "_buf"],
@@ -154,7 +154,7 @@ function M.open(input, opts)
     keymaps = {},
     actions = {},
     win_sides = {},
-    last_side = "new",
+    last_side = "right",
     state = {
       context_lines = opts.context_lines,
       collapsed_files = {},
@@ -173,8 +173,8 @@ function M.open(input, opts)
     end
   end
   view.annotation_ns = annotations.get_namespace()
-  view.old_buf = layout.create_scratch("review-diff://" .. (input.review_id or view.uid) .. "/old")
-  view.new_buf = layout.create_scratch("review-diff://" .. (input.review_id or view.uid) .. "/new")
+  view.left_buf = layout.create_scratch("review-diff://" .. (input.review_id or view.uid) .. "/left")
+  view.right_buf = layout.create_scratch("review-diff://" .. (input.review_id or view.uid) .. "/right")
   view.files = model.build(input.files or {}, opts).files
   for _, file in ipairs(view.files) do
     view.state.collapsed_files[file.id] = opts.collapse_on_open

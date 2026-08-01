@@ -4,37 +4,37 @@ describe("review diff model", function()
 
   it("maps changed source lines to one aligned row", function()
     local file = model.build_file({
-      old_path = "lua/example.lua",
-      new_path = "lua/example.lua",
-      old_text = "one\ntwo",
-      new_text = "one\nthree",
+      left_path = "lua/example.lua",
+      right_path = "lua/example.lua",
+      left_text = "one\ntwo",
+      right_text = "one\nthree",
       status = "modified",
     })
 
     assert.are.same({
       {
         kind = "context",
-        old_line = 1,
-        new_line = 1,
-        old_text = "one",
-        new_text = "one",
+        left_line = 1,
+        right_line = 1,
+        left_text = "one",
+        right_text = "one",
       },
       {
         kind = "change",
-        old_line = 2,
-        new_line = 2,
-        old_text = "two",
-        new_text = "three",
+        left_line = 2,
+        right_line = 2,
+        left_text = "two",
+        right_text = "three",
       },
     }, file.rows)
   end)
 
   it("records one hunk for a multi-line contiguous change", function()
     local file = model.build_file({
-      old_path = "lua/example.lua",
-      new_path = "lua/example.lua",
-      old_text = "one\nold a\nold b\nfour",
-      new_text = "one\nnew a\nnew b\nfour",
+      left_path = "lua/example.lua",
+      right_path = "lua/example.lua",
+      left_text = "one\nold a\nold b\nfour",
+      right_text = "one\nnew a\nnew b\nfour",
       status = "modified",
     })
 
@@ -43,20 +43,20 @@ describe("review diff model", function()
         id = 1,
         first_row = 2,
         last_row = 3,
-        old_start = 2,
-        old_end = 3,
-        new_start = 2,
-        new_end = 3,
+        left_start = 2,
+        left_end = 3,
+        right_start = 2,
+        right_end = 3,
       },
     }, file.hunks)
   end)
 
   it("records separate hunks for separate changed ranges", function()
     local file = model.build_file({
-      old_path = "lua/example.lua",
-      new_path = "lua/example.lua",
-      old_text = "one\ntwo\nthree\nfour",
-      new_text = "one\nthree\ninserted\nfour",
+      left_path = "lua/example.lua",
+      right_path = "lua/example.lua",
+      left_text = "one\ntwo\nthree\nfour",
+      right_text = "one\nthree\ninserted\nfour",
       status = "modified",
     })
 
@@ -65,33 +65,33 @@ describe("review diff model", function()
         id = 1,
         first_row = 2,
         last_row = 2,
-        old_start = 2,
-        old_end = 2,
-        new_start = nil,
-        new_end = nil,
+        left_start = 2,
+        left_end = 2,
+        right_start = nil,
+        right_end = nil,
       },
       {
         id = 2,
         first_row = 4,
         last_row = 4,
-        old_start = nil,
-        old_end = nil,
-        new_start = 3,
-        new_end = 3,
+        left_start = nil,
+        left_end = nil,
+        right_start = 3,
+        right_end = 3,
       },
     }, file.hunks)
   end)
 
   it("keeps binary and too-large files out of hunk navigation", function()
     local binary = model.build_file({
-      old_path = "bin/example",
-      new_path = "bin/example",
+      left_path = "bin/example",
+      right_path = "bin/example",
       binary = true,
       status = "binary",
     })
     local too_large = model.build_file({
-      old_path = "lua/large.lua",
-      new_path = "lua/large.lua",
+      left_path = "lua/large.lua",
+      right_path = "lua/large.lua",
       too_large = true,
       status = "modified",
     })
@@ -102,10 +102,10 @@ describe("review diff model", function()
 
   it("collapses unchanged ranges outside the configured context", function()
     local file = model.build_file({
-      old_path = "lua/example.lua",
-      new_path = "lua/example.lua",
-      old_text = "one\ntwo\nthree\nfour\nfive",
-      new_text = "one\ntwo\nchanged\nfour\nfive",
+      left_path = "lua/example.lua",
+      right_path = "lua/example.lua",
+      left_text = "one\ntwo\nthree\nfour\nfive",
+      right_text = "one\ntwo\nchanged\nfour\nfive",
       status = "modified",
     })
 
@@ -121,72 +121,72 @@ describe("review diff model", function()
 
   it("keeps additions and deletions aligned with placeholders", function()
     local file = model.build_file({
-      old_path = "lua/example.lua",
-      new_path = "lua/example.lua",
-      old_text = "one",
-      new_text = "one\ntwo",
+      left_path = "lua/example.lua",
+      right_path = "lua/example.lua",
+      left_text = "one",
+      right_text = "one\ntwo",
       status = "modified",
     })
 
     assert.are.same({
-      { kind = "context", old_line = 1, new_line = 1, old_text = "one", new_text = "one" },
-      { kind = "add", old_line = nil, new_line = 2, old_text = nil, new_text = "two" },
+      { kind = "context", left_line = 1, right_line = 1, left_text = "one", right_text = "one" },
+      { kind = "add", left_line = nil, right_line = 2, left_text = nil, right_text = "two" },
     }, file.rows)
   end)
 
   it("keeps context aligned around middle insertions and deletions", function()
     local inserted = model.build_file({
-      old_path = "lua/example.lua",
-      new_path = "lua/example.lua",
-      old_text = "one\ntwo\nthree",
-      new_text = "one\ninserted\ntwo\nthree",
+      left_path = "lua/example.lua",
+      right_path = "lua/example.lua",
+      left_text = "one\ntwo\nthree",
+      right_text = "one\ninserted\ntwo\nthree",
       status = "modified",
     })
     local deleted = model.build_file({
-      old_path = "lua/example.lua",
-      new_path = "lua/example.lua",
-      old_text = "one\ntwo\nthree",
-      new_text = "one\nthree",
+      left_path = "lua/example.lua",
+      right_path = "lua/example.lua",
+      left_text = "one\ntwo\nthree",
+      right_text = "one\nthree",
       status = "modified",
     })
 
     assert.are.same({
-      { kind = "context", old_line = 1, new_line = 1, old_text = "one", new_text = "one" },
-      { kind = "add", old_line = nil, new_line = 2, old_text = nil, new_text = "inserted" },
-      { kind = "context", old_line = 2, new_line = 3, old_text = "two", new_text = "two" },
-      { kind = "context", old_line = 3, new_line = 4, old_text = "three", new_text = "three" },
+      { kind = "context", left_line = 1, right_line = 1, left_text = "one", right_text = "one" },
+      { kind = "add", left_line = nil, right_line = 2, left_text = nil, right_text = "inserted" },
+      { kind = "context", left_line = 2, right_line = 3, left_text = "two", right_text = "two" },
+      { kind = "context", left_line = 3, right_line = 4, left_text = "three", right_text = "three" },
     }, inserted.rows)
     assert.are.same({
-      { kind = "context", old_line = 1, new_line = 1, old_text = "one", new_text = "one" },
-      { kind = "delete", old_line = 2, new_line = nil, old_text = "two", new_text = nil },
-      { kind = "context", old_line = 3, new_line = 2, old_text = "three", new_text = "three" },
+      { kind = "context", left_line = 1, right_line = 1, left_text = "one", right_text = "one" },
+      { kind = "delete", left_line = 2, right_line = nil, left_text = "two", right_text = nil },
+      { kind = "context", left_line = 3, right_line = 2, left_text = "three", right_text = "three" },
     }, deleted.rows)
   end)
 
   it("keeps context aligned across separate insertion and deletion hunks", function()
     local file = model.build_file({
-      old_path = "lua/example.lua",
-      new_path = "lua/example.lua",
-      old_text = "one\ntwo\nthree\nfour",
-      new_text = "one\nthree\ninserted\nfour",
+      left_path = "lua/example.lua",
+      right_path = "lua/example.lua",
+      left_text = "one\ntwo\nthree\nfour",
+      right_text = "one\nthree\ninserted\nfour",
       status = "modified",
     })
 
     assert.are.same({
-      { kind = "context", old_line = 1, new_line = 1, old_text = "one", new_text = "one" },
-      { kind = "delete", old_line = 2, new_line = nil, old_text = "two", new_text = nil },
-      { kind = "context", old_line = 3, new_line = 2, old_text = "three", new_text = "three" },
-      { kind = "add", old_line = nil, new_line = 3, old_text = nil, new_text = "inserted" },
-      { kind = "context", old_line = 4, new_line = 4, old_text = "four", new_text = "four" },
+      { kind = "context", left_line = 1, right_line = 1, left_text = "one", right_text = "one" },
+      { kind = "delete", left_line = 2, right_line = nil, left_text = "two", right_text = nil },
+      { kind = "context", left_line = 3, right_line = 2, left_text = "three", right_text = "three" },
+      { kind = "add", left_line = nil, right_line = 3, left_text = nil, right_text = "inserted" },
+      { kind = "context", left_line = 4, right_line = 4, left_text = "four", right_text = "four" },
     }, file.rows)
   end)
 
   it("finds changed ranges inside a replaced line", function()
     assert.are.same({
-      old_start = 0,
-      old_end = 3,
-      new_start = 0,
-      new_end = 4,
+      left_start = 0,
+      left_end = 3,
+      right_start = 0,
+      right_end = 4,
     }, model.inline_ranges("two", "four"))
   end)
 
@@ -195,12 +195,12 @@ describe("review diff model", function()
       display_kind = "line",
       source_row = {
         kind = "change",
-        old_line = 100000,
-        new_line = 100000,
-        old_text = "old",
-        new_text = "new",
+        left_line = 100000,
+        right_line = 100000,
+        left_text = "old",
+        right_text = "new",
       },
-    }, "new", { intra_line = true })
+    }, "right", { intra_line = true })
 
     assert.are.equal(0, inline.start)
   end)
@@ -210,21 +210,21 @@ describe("review diff model", function()
       display_kind = "line",
       source_row = {
         kind = "change",
-        old_line = 1,
-        new_line = 1,
-        old_text = "old",
-        new_text = "new",
+        left_line = 1,
+        right_line = 1,
+        left_text = "old",
+        right_text = "new",
       },
     }
 
-    local default_hl, default_inline = render.highlight(row, "new")
-    local _, detailed_inline = render.highlight(row, "new", { intra_line = true })
+    local default_hl, default_inline = render.highlight(row, "right")
+    local _, detailed_inline = render.highlight(row, "right", { intra_line = true })
 
     assert.are.equal("ReviewDiffAdd", default_hl)
     assert.is_nil(default_inline)
     assert.is_truthy(detailed_inline)
 
-    local old_hl = render.highlight(row, "old")
-    assert.are.equal("ReviewDiffDelete", old_hl)
+    local left_hl = render.highlight(row, "left")
+    assert.are.equal("ReviewDiffDelete", left_hl)
   end)
 end)

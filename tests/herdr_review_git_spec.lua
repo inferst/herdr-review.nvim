@@ -16,10 +16,10 @@ describe("herdr review git adapter", function()
     }, "\0"))
 
     assert.are.same({
-      { status = "modified", old_path = "lua/changed.lua", new_path = "lua/changed.lua" },
-      { status = "added", old_path = nil, new_path = "lua/added.lua" },
-      { status = "deleted", old_path = "lua/deleted.lua", new_path = nil },
-      { status = "renamed", old_path = "lua/old.lua", new_path = "lua/new.lua" },
+      { status = "modified", left_path = "lua/changed.lua", right_path = "lua/changed.lua" },
+      { status = "added", left_path = nil, right_path = "lua/added.lua" },
+      { status = "deleted", left_path = "lua/deleted.lua", right_path = nil },
+      { status = "renamed", left_path = "lua/old.lua", right_path = "lua/new.lua" },
     }, files)
   end)
 
@@ -61,9 +61,9 @@ describe("herdr review git adapter", function()
     assert.is_truthy(resolved)
     assert.are.equal(vim.uv.fs_realpath(root), resolved.repo_root)
     assert.are.equal(1, #resolved.files)
-    assert.are.equal("example.txt", resolved.files[1].new_path)
-    assert.are.equal("one\n", resolved.files[1].old_text)
-    assert.are.equal("two\n", resolved.files[1].new_text)
+    assert.are.equal("example.txt", resolved.files[1].right_path)
+    assert.are.equal("one\n", resolved.files[1].left_text)
+    assert.are.equal("two\n", resolved.files[1].right_text)
     assert.are.same({ "two" }, vim.fn.readfile(root .. "/example.txt"))
 
     vim.fn.delete(root, "rf")

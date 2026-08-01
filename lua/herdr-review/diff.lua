@@ -7,7 +7,7 @@ function M.get_current_view()
   return viewer.current()
 end
 
----@return string|nil file, "old"|"new"|nil side, integer|nil line
+---@return string|nil file, "left"|"right"|nil side, integer|nil line
 function M.get_cursor_context()
   local view = viewer.current()
   if not view then

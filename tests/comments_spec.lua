@@ -3,10 +3,10 @@ describe("review comments", function()
 
   it("sorts comments by file, side, line, and id", function()
     local input = {
-      { id = "new-late", file = "b.lua", side = "new", line = 8 },
-      { id = "old", file = "a.lua", side = "old", line = 3 },
-      { id = "new", file = "a.lua", side = "new", line = 2 },
-      { id = "new-early", file = "b.lua", side = "new", line = 2 },
+      { id = "new-late", file = "b.lua", side = "right", line = 8 },
+      { id = "old", file = "a.lua", side = "left", line = 3 },
+      { id = "new", file = "a.lua", side = "right", line = 2 },
+      { id = "new-early", file = "b.lua", side = "right", line = 2 },
     }
 
     local sorted = comments.sort(input)
@@ -21,10 +21,10 @@ describe("review comments", function()
   end)
 
   it("finds the comment occupying a diff position", function()
-    local comment = { id = "comment-1", file = "lua/init.lua", side = "new", line = 17 }
+    local comment = { id = "comment-1", file = "lua/init.lua", side = "right", line = 17 }
 
-    assert.are.equal(comment, comments.find_at({ comment }, "lua/init.lua", "new", 17))
-    assert.is_nil(comments.find_at({ comment }, "lua/init.lua", "old", 17))
-    assert.is_nil(comments.find_at({ comment }, "lua/init.lua", "new", 18))
+    assert.are.equal(comment, comments.find_at({ comment }, "lua/init.lua", "right", 17))
+    assert.is_nil(comments.find_at({ comment }, "lua/init.lua", "left", 17))
+    assert.is_nil(comments.find_at({ comment }, "lua/init.lua", "right", 18))
   end)
 end)

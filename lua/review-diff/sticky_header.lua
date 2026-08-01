@@ -155,7 +155,7 @@ function M.update(view)
     return
   end
 
-  for _, side in ipairs({ "old", "new" }) do
+  for _, side in ipairs({ "left", "right" }) do
     update_side(view, side)
   end
 end
@@ -177,8 +177,8 @@ end
 ---@param view table
 function M.attach(view)
   view.sticky_headers = {
-    old = {},
-    new = {},
+    left = {},
+    right = {},
   }
   view:on("rendered", M.update)
   view:on("closed", M.dispose)

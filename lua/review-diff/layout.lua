@@ -34,17 +34,17 @@ function M.open_tab(view)
   view.tabpage = vim.api.nvim_get_current_tabpage()
   local placeholder = vim.api.nvim_get_current_buf()
   local left_win = vim.api.nvim_get_current_win()
-  vim.api.nvim_win_set_buf(left_win, view.old_buf)
+  vim.api.nvim_win_set_buf(left_win, view.left_buf)
   vim.cmd("rightbelow vsplit")
   local right_win = vim.api.nvim_get_current_win()
-  vim.api.nvim_win_set_buf(right_win, view.new_buf)
-  view.old_win = left_win
-  view.new_win = right_win
-  view.win_sides[left_win] = "old"
-  view.win_sides[right_win] = "new"
+  vim.api.nvim_win_set_buf(right_win, view.right_buf)
+  view.left_win = left_win
+  view.right_win = right_win
+  view.win_sides[left_win] = "left"
+  view.win_sides[right_win] = "right"
   M.set_window_options(left_win)
   M.set_window_options(right_win)
-  if vim.api.nvim_buf_is_valid(placeholder) and placeholder ~= view.old_buf and placeholder ~= view.new_buf then
+  if vim.api.nvim_buf_is_valid(placeholder) and placeholder ~= view.left_buf and placeholder ~= view.right_buf then
     pcall(vim.api.nvim_buf_delete, placeholder, { force = true })
   end
 end

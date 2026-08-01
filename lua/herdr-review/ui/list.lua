@@ -40,7 +40,7 @@ end
 ---@param width integer
 ---@return string
 local function render_comment(comment, width)
-  local marker = comment.side == "new" and "+" or "−"
+  local marker = comment.side == "right" and "+" or "−"
   local stale = comment.stale and " [stale]" or ""
   local prefix = string.format("%s:%s  %s%s  ", comment.file, comment.line, marker, stale)
   local text_width = width - vim.fn.strdisplaywidth(prefix)

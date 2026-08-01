@@ -10,22 +10,22 @@ describe("review session", function()
     return {
       repo_root = vim.fn.getcwd(),
       review_id = review_id,
-      spec = { old = { kind = "ref", name = "HEAD" }, new = { kind = "worktree" } },
+      spec = { base = { kind = "ref", name = "HEAD" }, head = { kind = "worktree" } },
       files = {
         {
           id = "lua/a.lua",
-          old_path = "lua/a.lua",
-          new_path = "lua/a.lua",
-          old_text = "one\ntwo\nthree\nfour\nfive\nsix\nseven\neight",
-          new_text = "one\ntwo\nTHREE\nfour\nfive\nsix\nseven\neight",
+          left_path = "lua/a.lua",
+          right_path = "lua/a.lua",
+          left_text = "one\ntwo\nthree\nfour\nfive\nsix\nseven\neight",
+          right_text = "one\ntwo\nTHREE\nfour\nfive\nsix\nseven\neight",
           status = "modified",
         },
         {
           id = "lua/b.lua",
-          old_path = "lua/b.lua",
-          new_path = "lua/b.lua",
-          old_text = "alpha\nbeta",
-          new_text = "alpha\nBETA",
+          left_path = "lua/b.lua",
+          right_path = "lua/b.lua",
+          left_text = "alpha\nbeta",
+          right_text = "alpha\nBETA",
           status = "modified",
         },
       },
@@ -54,14 +54,14 @@ describe("review session", function()
     view = viewer.open({
       repo_root = vim.fn.getcwd(),
       review_id = "HEAD..WORKTREE",
-      spec = { old = { kind = "ref", name = "HEAD" }, new = { kind = "worktree" } },
+      spec = { base = { kind = "ref", name = "HEAD" }, head = { kind = "worktree" } },
       files = {
         {
           id = "lua/init.lua",
-          old_path = "lua/init.lua",
-          new_path = "lua/init.lua",
-          old_text = "one\ntwo\nthree",
-          new_text = "one\ntwo\nchanged",
+          left_path = "lua/init.lua",
+          right_path = "lua/init.lua",
+          left_text = "one\ntwo\nthree",
+          right_text = "one\ntwo\nchanged",
           status = "modified",
         },
       },
@@ -81,7 +81,7 @@ describe("review session", function()
     local _, err = storage.add_comment("HEAD..WORKTREE", {
       id = "comment-1",
       file = "lua/init.lua",
-      side = "new",
+      side = "right",
       line = 3,
       text = "Review this line.",
       created_at = "2026-07-26T00:00:00Z",
@@ -91,7 +91,7 @@ describe("review session", function()
     session.on_view_opened(view)
 
     assert.are.equal("HEAD..WORKTREE", session.get_current_range())
-    local marks = vim.api.nvim_buf_get_extmarks(view.new_buf, view.annotation_ns, 0, -1, { details = true })
+    local marks = vim.api.nvim_buf_get_extmarks(view.right_buf, view.annotation_ns, 0, -1, { details = true })
     assert.are.equal(1, #marks)
     local vl = marks[1][4].virt_lines
     assert.are_not.equal(nil, vl)
@@ -102,7 +102,7 @@ describe("review session", function()
     local comment = {
       id = "comment-session-mutation",
       file = "lua/init.lua",
-      side = "new",
+      side = "right",
       line = 3,
       text = "Review this line.",
       created_at = "2026-07-26T00:00:00Z",
@@ -112,7 +112,7 @@ describe("review session", function()
 
     assert.is_nil(add_err)
     assert.are.same(comment, added.comments[1])
-    assert.are.equal(1, #vim.api.nvim_buf_get_extmarks(view.new_buf, view.annotation_ns, 0, -1, {}))
+    assert.are.equal(1, #vim.api.nvim_buf_get_extmarks(view.right_buf, view.annotation_ns, 0, -1, {}))
 
     local updated, update_err = session.update_comment("HEAD..WORKTREE", comment.id, { text = "Updated." })
 
@@ -123,14 +123,14 @@ describe("review session", function()
 
     assert.is_nil(delete_err)
     assert.are.same({}, deleted.comments)
-    assert.are.equal(0, #vim.api.nvim_buf_get_extmarks(view.new_buf, view.annotation_ns, 0, -1, {}))
+    assert.are.equal(0, #vim.api.nvim_buf_get_extmarks(view.right_buf, view.annotation_ns, 0, -1, {}))
   end)
 
   it("reanchors comments from their saved context", function()
     local _, err = storage.add_comment("HEAD..WORKTREE", {
       id = "comment-anchor",
       file = "lua/init.lua",
-      side = "new",
+      side = "right",
       line = 2,
       text = "Follow this line.",
       context = "one\ntwo\nchanged",
@@ -140,21 +140,21 @@ describe("review session", function()
     view:replace({
       repo_root = vim.fn.getcwd(),
       review_id = "HEAD..WORKTREE",
-      spec = { old = { kind = "ref", name = "HEAD" }, new = { kind = "worktree" } },
+      spec = { base = { kind = "ref", name = "HEAD" }, head = { kind = "worktree" } },
       files = {
         {
           id = "lua/init.lua",
-          old_path = "lua/init.lua",
-          new_path = "lua/init.lua",
-          old_text = "one\ntwo\nthree",
-          new_text = "zero\none\ntwo\nchanged",
+          left_path = "lua/init.lua",
+          right_path = "lua/init.lua",
+          left_text = "one\ntwo\nthree",
+          right_text = "zero\none\ntwo\nchanged",
           status = "modified",
         },
       },
     })
     assert.are.same(
-      { file = "lua/init.lua", side = "new", line = 3 },
-      view:resolve_location({ file = "lua/init.lua", side = "new", line = 2 }, "one\ntwo\nchanged")
+      { file = "lua/init.lua", side = "right", line = 3 },
+      view:resolve_location({ file = "lua/init.lua", side = "right", line = 2 }, "one\ntwo\nchanged")
     )
     session.on_view_opened(view)
 
@@ -174,7 +174,7 @@ describe("review session", function()
     local fold_key = first_fold_key(view, "lua/a.lua")
     assert.is_truthy(fold_key)
     view.state.expanded_folds[fold_key] = true
-    set_cursor_at_location(view, { file = "lua/a.lua", side = "old", line = 3 })
+    set_cursor_at_location(view, { file = "lua/a.lua", side = "left", line = 3 })
     session.on_view_opened(view)
 
     session.on_view_closed(view)
@@ -185,8 +185,8 @@ describe("review session", function()
     assert.is_false(view.state.collapsed_files["lua/a.lua"])
     assert.is_true(view.state.collapsed_files["lua/b.lua"])
     assert.is_true(view.state.expanded_folds[fold_key])
-    vim.api.nvim_set_current_win(view.old_win)
-    assert.are.same({ file = "lua/a.lua", side = "old", line = 3, col = 0 }, view:get_cursor_location())
+    vim.api.nvim_set_current_win(view.left_win)
+    assert.are.same({ file = "lua/a.lua", side = "left", line = 3, col = 0 }, view:get_cursor_location())
   end)
 
   it("discards pending state when another review opens first", function()
@@ -196,7 +196,7 @@ describe("review session", function()
     view:replace(state_input("session-state-old"))
     view.state.collapsed_files["lua/a.lua"] = false
     view:render()
-    set_cursor_at_location(view, { file = "lua/a.lua", side = "new", line = 3 })
+    set_cursor_at_location(view, { file = "lua/a.lua", side = "right", line = 3 })
     session.on_view_opened(view)
 
     session.on_view_closed(view)
@@ -219,7 +219,7 @@ describe("review session", function()
     view:replace(state_input("session-loading"))
     view.state.collapsed_files["lua/a.lua"] = false
     view:render()
-    set_cursor_at_location(view, { file = "lua/a.lua", side = "new", line = 3 })
+    set_cursor_at_location(view, { file = "lua/a.lua", side = "right", line = 3 })
     session.on_view_opened(view)
 
     session.on_view_closed(view)
@@ -227,7 +227,7 @@ describe("review session", function()
     view = viewer.open({
       repo_root = vim.fn.getcwd(),
       review_id = "loading",
-      spec = { old = { kind = "ref", name = "HEAD" }, new = { kind = "worktree" } },
+      spec = { base = { kind = "ref", name = "HEAD" }, head = { kind = "worktree" } },
       files = {},
     }, { context_lines = 1, collapse_on_open = true, syntax = false })
     session.on_view_opened(view)
@@ -238,7 +238,7 @@ describe("review session", function()
     session.on_view_opened(view)
 
     assert.is_false(view.state.collapsed_files["lua/a.lua"])
-    vim.api.nvim_set_current_win(view.new_win)
-    assert.are.same({ file = "lua/a.lua", side = "new", line = 3, col = 0 }, view:get_cursor_location())
+    vim.api.nvim_set_current_win(view.right_win)
+    assert.are.same({ file = "lua/a.lua", side = "right", line = 3, col = 0 }, view:get_cursor_location())
   end)
 end)

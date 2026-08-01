@@ -160,7 +160,7 @@ function M.set_cursor_row(view, row_index, col)
     view.last_side = current_side
   end
   local active_side = view.last_side
-  for _, side in ipairs({ "old", "new" }) do
+  for _, side in ipairs({ "left", "right" }) do
     local win = view[side .. "_win"]
     if layout.valid_window(win) then
       local win_col = (col and col > 0 and side == active_side) and col or 0

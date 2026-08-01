@@ -33,24 +33,24 @@ function M.parse_name_status(output)
     if status_token:sub(1, 1) == "R" or status_token:sub(1, 1) == "C" then
       table.insert(files, {
         status = status,
-        old_path = tokens[index + 1],
-        new_path = tokens[index + 2],
+        left_path = tokens[index + 1],
+        right_path = tokens[index + 2],
       })
       index = index + 3
     else
       local path = tokens[index + 1]
       if path then
-        local old_path = path
-        local new_path = path
+        local left_path = path
+        local right_path = path
         if status == "added" then
-          old_path = nil
+          left_path = nil
         elseif status == "deleted" then
-          new_path = nil
+          right_path = nil
         end
         table.insert(files, {
           status = status,
-          old_path = old_path,
-          new_path = new_path,
+          left_path = left_path,
+          right_path = right_path,
         })
       end
       index = index + 2
@@ -154,10 +154,10 @@ local function resolve_endpoint(job, root, endpoint, callback)
   end)
 end
 
-local function resolve_files(job, root, spec, new_oid, compare_old_oid, callback)
-  local args = { "diff", "--name-status", "-z", "-M", compare_old_oid }
-  if spec.new.kind ~= "worktree" then
-    table.insert(args, new_oid)
+local function resolve_files(job, root, spec, head_oid, compare_base_oid, callback)
+  local args = { "diff", "--name-status", "-z", "-M", compare_base_oid }
+  if spec.head.kind ~= "worktree" then
+    table.insert(args, head_oid)
   end
   table.insert(args, "--")
 
@@ -168,7 +168,7 @@ local function resolve_files(job, root, spec, new_oid, compare_old_oid, callback
     end
 
     local files = M.parse_name_status(result.stdout)
-    if spec.new.kind ~= "worktree" then
+    if spec.head.kind ~= "worktree" then
       callback(files, nil)
       return
     end
@@ -180,12 +180,12 @@ local function resolve_files(job, root, spec, new_oid, compare_old_oid, callback
       end
       local known = {}
       for _, file in ipairs(files) do
-        known[file.new_path or file.old_path] = true
+        known[file.right_path or file.left_path] = true
       end
       for _, path in ipairs(vim.split(untracked.stdout or "", "\0", { plain = true, trimempty = true })) do
         local stat = vim.uv.fs_stat(vim.fs.joinpath(root, path))
         if not known[path] and stat and stat.type == "file" then
-          table.insert(files, { status = "added", new_path = path })
+          table.insert(files, { status = "added", right_path = path })
         end
       end
       callback(files, nil)
@@ -193,29 +193,29 @@ local function resolve_files(job, root, spec, new_oid, compare_old_oid, callback
   end)
 end
 
-local function load_file_contents(job, root, spec, old_content_oid, new_oid, files, index, callback)
+local function load_file_contents(job, root, spec, base_content_oid, head_oid, files, index, callback)
   if index > #files then
     callback(files, nil)
     return
   end
   local file = files[index]
   local result = vim.deepcopy(file)
-  load_content(job, root, spec.old, old_content_oid, file.old_path, function(old_content, old_error)
-    if old_error then
-      callback(nil, old_error)
+  load_content(job, root, spec.base, base_content_oid, file.left_path, function(base_content, base_error)
+    if base_error then
+      callback(nil, base_error)
       return
     end
-    load_content(job, root, spec.new, new_oid, file.new_path, function(new_content, new_error)
-      if new_error then
-        callback(nil, new_error)
+    load_content(job, root, spec.head, head_oid, file.right_path, function(head_content, head_error)
+      if head_error then
+        callback(nil, head_error)
         return
       end
-      result.old_text = old_content and old_content.text or nil
-      result.new_text = new_content and new_content.text or nil
-      result.binary = (old_content and old_content.binary) or (new_content and new_content.binary)
-      result.too_large = (old_content and old_content.too_large) or (new_content and new_content.too_large)
+      result.left_text = base_content and base_content.text or nil
+      result.right_text = head_content and head_content.text or nil
+      result.binary = (base_content and base_content.binary) or (head_content and head_content.binary)
+      result.too_large = (base_content and base_content.too_large) or (head_content and head_content.too_large)
       files[index] = result
-      load_file_contents(job, root, spec, old_content_oid, new_oid, files, index + 1, callback)
+      load_file_contents(job, root, spec, base_content_oid, head_oid, files, index + 1, callback)
     end)
   end)
 end
@@ -253,7 +253,7 @@ function M.resolve(spec, opts, callbacks)
   -- The resolution runs as a sequence of async steps. Each step derives one
   -- Git fact into `ctx` and calls the next; any failure funnels through `fail`.
   -- Forward-declared so the steps read in execution order, top to bottom.
-  local resolve_root, resolve_old, resolve_new, resolve_compare_base, list_files, load_contents, deliver
+  local resolve_root, resolve_base, resolve_head, resolve_compare_base, list_files, load_contents, deliver
 
   function resolve_root()
     run_git(job, cwd, { "rev-parse", "--show-toplevel" }, function(result)
@@ -261,46 +261,46 @@ function M.resolve(spec, opts, callbacks)
         return fail(error_message(result, "Not inside a Git repository"))
       end
       ctx.root = vim.trim(result.stdout)
-      resolve_old()
+      resolve_base()
     end)
   end
 
-  function resolve_old()
-    resolve_endpoint(job, ctx.root, spec.old, function(old_oid, err)
+  function resolve_base()
+    resolve_endpoint(job, ctx.root, spec.base, function(base_oid, err)
       if err then
         return fail(err)
       end
-      ctx.old_oid = old_oid
-      resolve_new()
+      ctx.base_oid = base_oid
+      resolve_head()
     end)
   end
 
-  function resolve_new()
-    resolve_endpoint(job, ctx.root, spec.new, function(new_oid, err)
+  function resolve_head()
+    resolve_endpoint(job, ctx.root, spec.head, function(head_oid, err)
       if err then
         return fail(err)
       end
-      ctx.new_oid = new_oid
+      ctx.head_oid = head_oid
       resolve_compare_base()
     end)
   end
 
   function resolve_compare_base()
     if spec.operator ~= "..." then
-      ctx.compare_old_oid = ctx.old_oid
+      ctx.compare_base_oid = ctx.base_oid
       return list_files()
     end
-    run_git(job, ctx.root, { "merge-base", ctx.old_oid, ctx.new_oid }, function(result)
+    run_git(job, ctx.root, { "merge-base", ctx.base_oid, ctx.head_oid }, function(result)
       if result.code ~= 0 then
         return fail(error_message(result, "Could not find merge-base"))
       end
-      ctx.compare_old_oid = vim.trim(result.stdout)
+      ctx.compare_base_oid = vim.trim(result.stdout)
       list_files()
     end)
   end
 
   function list_files()
-    resolve_files(job, ctx.root, spec, ctx.new_oid, ctx.compare_old_oid, function(files, err)
+    resolve_files(job, ctx.root, spec, ctx.head_oid, ctx.compare_base_oid, function(files, err)
       if err then
         return fail(err)
       end
@@ -310,7 +310,7 @@ function M.resolve(spec, opts, callbacks)
   end
 
   function load_contents()
-    load_file_contents(job, ctx.root, spec, ctx.compare_old_oid, ctx.new_oid, ctx.files, 1, function(files, err)
+    load_file_contents(job, ctx.root, spec, ctx.compare_base_oid, ctx.head_oid, ctx.files, 1, function(files, err)
       if err then
         return fail(err)
       end
@@ -323,20 +323,20 @@ function M.resolve(spec, opts, callbacks)
     if not callbacks.on_ready then
       return
     end
-    local target_id = spec.new.kind == "worktree" and "WORKTREE" or ctx.new_oid
+    local target_id = spec.head.kind == "worktree" and "WORKTREE" or ctx.head_oid
     callbacks.on_ready({
       cwd = opts.cwd,
       repo_root = ctx.root,
-      review_id = hash_parts({ ctx.root, spec.operator, ctx.compare_old_oid, target_id }),
+      review_id = hash_parts({ ctx.root, spec.operator, ctx.compare_base_oid, target_id }),
       label = spec_module.label(spec),
-      header_old = spec_module.header_side(spec.old),
-      header_new = spec_module.header_side(spec.new),
+      header_left = spec_module.header_side(spec.base),
+      header_right = spec_module.header_side(spec.head),
       spec = vim.deepcopy(spec),
       files = ctx.files,
       resolved = {
-        old_oid = ctx.old_oid,
-        new_oid = ctx.new_oid,
-        compare_old_oid = ctx.compare_old_oid,
+        base_oid = ctx.base_oid,
+        head_oid = ctx.head_oid,
+        compare_base_oid = ctx.compare_base_oid,
       },
     })
   end

@@ -148,11 +148,11 @@ function M.display_rows(files, state)
 end
 
 ---@param row table
----@param side "old"|"new"
+---@param side "left"|"right"
 ---@return string
 function M.text(row, side)
   if row.display_kind == "diff_header" then
-    return side == "old" and (row.header_old or "") or (row.header_new or "")
+    return side == "left" and (row.header_left or "") or (row.header_right or "")
   end
   if row.display_kind == "hint" then
     return row.hint_text or ""
@@ -179,21 +179,21 @@ function M.text(row, side)
 
   local source_row = row.source_row
   local text
-  if side == "old" then
-    text = source_row.old_text
+  if side == "left" then
+    text = source_row.left_text
   else
-    text = source_row.new_text
+    text = source_row.right_text
   end
   return text or ""
 end
 
 ---@param row table
----@param side "old"|"new"
+---@param side "left"|"right"
 ---@param opts table|nil
 ---@return string|nil, table|nil
 function M.highlight(row, side, opts)
   if row.display_kind == "diff_header" then
-    local header_text = side == "old" and (row.header_old or "") or (row.header_new or "")
+    local header_text = side == "left" and (row.header_left or "") or (row.header_right or "")
     if header_text == "" then
       return nil, nil
     end
@@ -244,18 +244,18 @@ function M.highlight(row, side, opts)
 
   local source_row = row.source_row
   local line_text
-  if side == "old" then
-    line_text = source_row.old_text
+  if side == "left" then
+    line_text = source_row.left_text
   else
-    line_text = source_row.new_text
+    line_text = source_row.right_text
   end
   local line_hl
   if source_row.kind == "add" then
-    line_hl = side == "new" and "ReviewDiffAdd" or "ReviewDiffChange"
+    line_hl = side == "right" and "ReviewDiffAdd" or "ReviewDiffChange"
   elseif source_row.kind == "delete" then
-    line_hl = side == "old" and "ReviewDiffDelete" or "ReviewDiffChange"
+    line_hl = side == "left" and "ReviewDiffDelete" or "ReviewDiffChange"
   elseif source_row.kind == "change" then
-    line_hl = side == "old" and "ReviewDiffDelete" or "ReviewDiffAdd"
+    line_hl = side == "left" and "ReviewDiffDelete" or "ReviewDiffAdd"
   end
 
   if source_row.kind ~= "change" or not line_text then
@@ -266,33 +266,33 @@ function M.highlight(row, side, opts)
     return line_hl, nil
   end
 
-  local old_text = source_row.old_text or ""
-  local new_text = source_row.new_text or ""
-  local range = model.inline_ranges(old_text, new_text)
+  local left_text = source_row.left_text or ""
+  local right_text = source_row.right_text or ""
+  local range = model.inline_ranges(left_text, right_text)
   if not range then
     return line_hl, nil
   end
 
   local inline_hl
-  if side == "old" then
+  if side == "left" then
     inline_hl = "ReviewDiffDeleteIntra"
   else
     inline_hl = "ReviewDiffAddIntra"
   end
 
-  if side == "old" then
+  if side == "left" then
     return line_hl,
       {
-        start = range.old_start,
-        finish = range.old_end,
+        start = range.left_start,
+        finish = range.left_end,
         hl_group = inline_hl,
         line_text = line_text,
       }
   end
   return line_hl,
     {
-      start = range.new_start,
-      finish = range.new_end,
+      start = range.right_start,
+      finish = range.right_end,
       hl_group = inline_hl,
       line_text = line_text,
     }
