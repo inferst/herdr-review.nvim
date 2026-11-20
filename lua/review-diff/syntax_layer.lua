@@ -151,27 +151,29 @@ local function files_by_priority(view)
 end
 
 ---Schedules async syntax highlighting queue for all files.
----Each file is processed in a separate vim.schedule tick.
 ---@param view table
 ---@param generation integer
 local function schedule_queue(view, generation)
   local ordered = files_by_priority(view)
+  if #ordered == 0 then
+    return
+  end
   local index = 1
 
   local function process_next()
     if view.closed or view._syntax_generation ~= generation then
       return
     end
-    if index > #ordered then
-      return
-    end
     local file = ordered[index]
     index = index + 1
     apply_file_syntax(view, file)
-    vim.schedule(process_next)
+    if index <= #ordered then
+      vim.defer_fn(process_next, 1)
+    end
   end
 
-  vim.schedule(process_next)
+  -- Yield to redraw before parsing the first file and between files.
+  vim.defer_fn(process_next, 1)
 end
 
 ---Full re-apply of Tree-sitter syntax across every file and both sides.

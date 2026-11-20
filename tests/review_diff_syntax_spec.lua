@@ -22,6 +22,44 @@ describe("review diff syntax", function()
     assert.is_truthy(spans[1].hl_group)
   end)
 
+  it("collects injected Vimscript highlights at the source columns in Lua", function()
+    for _, language in ipairs({ "lua", "vim" }) do
+      if not pcall(vim.treesitter.get_string_parser, "", language) then
+        return
+      end
+    end
+
+    local query = vim.treesitter.query
+    local get_query = query.get
+    local injections = query.parse(
+      "lua",
+      [[((string content: (string_content) @injection.content)
+         (#set! injection.language "vim"))]]
+    )
+    local highlights = query.parse("vim", "(identifier) @variable")
+    query.get = function(language, name)
+      if language == "lua" and name == "injections" then
+        return injections
+      end
+      if language == "vim" and name == "highlights" then
+        return highlights
+      end
+      return get_query(language, name)
+    end
+
+    local text = "local command = [[let value = 1]]"
+    local ok, spans = pcall(syntax.collect, "example.lua", text)
+    query.get = get_query
+    assert(ok, spans)
+
+    local start_col, end_col = text:find("value", 1, true)
+    local injected = vim.tbl_filter(function(span)
+      return span.hl_group == "@variable.vim"
+    end, spans)
+    assert.are.same(1, #injected)
+    assert.are.same({ 1, start_col - 1, end_col }, { injected[1].line, injected[1].start_col, injected[1].end_col })
+  end)
+
   it("skips collection when text exceeds max_lines", function()
     local text = "local value = 1\nreturn value"
     -- With max_lines=1, a 2-line text should be skipped

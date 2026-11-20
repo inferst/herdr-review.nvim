@@ -49,7 +49,7 @@ function M.language_for_filetype(filetype)
   return language
 end
 
-local function add_capture_spans(spans, query, node, _, lines)
+local function add_capture_spans(spans, group, node, lines)
   local start_row, start_col, end_row, end_col = node:range()
   if start_row == end_row and start_col >= end_col then
     return
@@ -63,34 +63,60 @@ local function add_capture_spans(spans, query, node, _, lines)
         line = row + 1,
         start_col = start_column,
         end_col = finish_column,
-        hl_group = "@" .. query,
+        hl_group = group,
         priority = 100,
       })
     end
   end
 end
 
-local function collect_from_buffer(bufnr, language, lines)
-  local parser = vim.treesitter.get_parser(bufnr, language)
-  local trees = parser:parse()
-  local tree = trees and trees[1]
-  if not tree then
-    return {}
+local function highlights_for_language(language, suffix)
+  local ok, query = pcall(vim.treesitter.query.get, language, "highlights")
+  if not ok or not query then
+    return false
   end
 
-  local highlight_query = vim.treesitter.query.get(language, "highlights")
-  if not highlight_query then
-    return {}
-  end
-
-  local spans = {}
-  for capture_id, node in highlight_query:iter_captures(tree:root(), bufnr, 0, -1) do
-    local capture = highlight_query.captures[capture_id]
-    local capture_name = capture and capture:match("^([^%.]+)")
-    if capture and not ignored_captures[capture_name] then
-      add_capture_spans(spans, capture, node, bufnr, lines)
+  local groups = {}
+  for id, capture in ipairs(query.captures) do
+    local capture_name = capture:match("^([^%.]+)")
+    if not ignored_captures[capture_name] then
+      groups[id] = "@" .. capture .. suffix
     end
   end
+  return { query = query, groups = groups }
+end
+
+local function collect_from_buffer(bufnr, language, lines)
+  local parser = vim.treesitter.get_parser(bufnr, language)
+  if not parser then
+    return {}
+  end
+
+  -- Markdown uses the existing fence provider, including its Pandoc-style fence support.
+  local use_native_injections = injection_providers[language] == nil
+  parser:parse(use_native_injections)
+  local spans = {}
+  local highlights = {}
+  parser:for_each_tree(function(tree, language_tree)
+    if not use_native_injections and language_tree ~= parser then
+      return
+    end
+    local tree_language = language_tree:lang()
+    if highlights[tree_language] == nil then
+      local suffix = tree_language == language and "" or "." .. tree_language
+      highlights[tree_language] = highlights_for_language(tree_language, suffix)
+    end
+    local highlight = highlights[tree_language]
+    if not highlight then
+      return
+    end
+    for id, node in highlight.query:iter_captures(tree:root(), bufnr, 0, -1) do
+      local group = highlight.groups[id]
+      if group then
+        add_capture_spans(spans, group, node, lines)
+      end
+    end
+  end)
   return spans
 end
 
